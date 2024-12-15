@@ -4,9 +4,67 @@ import cv2
 from basler_camera import BaslerCamera
 import os
 from datetime import datetime
- 
- 
+import numpy as np
+
+def detect_aruco_markers(image_path):
+    # Load camera calibration
+    camera_matrix = np.load('camera_matrix.npy')
+    dist_coeffs = np.load('dist_coeffs.npy')
+    
+    # Read the image
+    img = cv2.imread(image_path)
+    if img is None:
+        print(f"Could not read image: {image_path}")
+        return
+        
+    # Get optimal new camera matrix and undistort the image
+    h, w = img.shape[:2]
+    new_camera_matrix, roi = cv2.getOptimalNewCameraMatrix(
+        camera_matrix, dist_coeffs, (w,h), 1, (w,h))
+    undistorted_img = cv2.undistort(img, camera_matrix, dist_coeffs, None, new_camera_matrix)
+        
+    # Create ArUco dictionary and parameters
+    aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
+    parameters = cv2.aruco.DetectorParameters()
+    detector = cv2.aruco.ArucoDetector(aruco_dict, parameters)
+    
+    # Detect markers on undistorted image
+    corners, ids, rejected = detector.detectMarkers(undistorted_img)
+    
+    if ids is not None:
+        # Draw detected markers
+        img_display = undistorted_img.copy()
+        cv2.aruco.drawDetectedMarkers(img_display, corners, ids)
+        
+        # Estimate pose for each marker
+        rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(
+            corners, 35.0, new_camera_matrix, dist_coeffs)  # 35mm marker size
+            
+        # Draw axes for each marker
+        for i in range(len(ids)):
+            cv2.drawFrameAxes(img_display, new_camera_matrix, dist_coeffs, 
+                            rvecs[i], tvecs[i], 30)  # 30mm axis length
+            
+            # Print marker information
+            marker_id = ids[i][0]
+            position = tvecs[i][0]
+            rotation = rvecs[i][0]
+            print(f"\nMarker {marker_id}:")
+            print(f"Position (mm): X={position[0]:.1f}, Y={position[1]:.1f}, Z={position[2]:.1f}")
+            print(f"Rotation (rad): X={rotation[0]:.2f}, Y={rotation[1]:.2f}, Z={rotation[2]:.2f}")
+            
+        # Display both original and undistorted images
+        cv2.namedWindow('Original Image', cv2.WINDOW_NORMAL)
+        cv2.imshow('Original Image', img)
+        cv2.namedWindow('Undistorted Image with Markers', cv2.WINDOW_NORMAL)
+        cv2.imshow('Undistorted Image with Markers', img_display)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+    else:
+        print("No ArUco markers detected")
+
 def main():
+    # Original camera capture code
     camera: BaslerCamera = BaslerCamera()
  
     # Camera can be connected based on its' IP or name:
@@ -42,16 +100,13 @@ def main():
         cv2.imwrite(filename, img)
         print(f"Image saved as: {filename}")
         
-        # Show the image in OpenCV
-        cv2.namedWindow('Camera image', cv2.WINDOW_NORMAL)
-        cv2.imshow('Camera image', img)
-        cv2.waitKey(0)
+        # Process the captured image for ArUco markers
+        detect_aruco_markers(filename)
     else:
         print("The image was not captured.")
  
     # Close communication with the camera before finish.
     camera.close()
- 
  
 if __name__ == '__main__':
     main()
