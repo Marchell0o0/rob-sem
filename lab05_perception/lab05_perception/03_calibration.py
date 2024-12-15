@@ -22,7 +22,7 @@ def calibrate(dir, grid, square_size, img_max_width=1024, viz=True):
     corners3d = np.zeros((1, grid[0] * grid[1], 3), np.float32)
     corners3d[0, :, :2] = np.mgrid[0 : grid[0], 0 : grid[1]].T.reshape(-1, 2)
     corners3d *= square_size  # needed for proper extrinsics only
-    print(f"3D points: {corners3d}")
+
     # Get the 2D points of the chessboard corners in each image
     pts2d = []
     camera_idxs = []
