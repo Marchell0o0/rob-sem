@@ -3,16 +3,25 @@ import numpy as np
 from basler_camera import BaslerCamera
 import os
 from datetime import datetime
-
-def capture_calibration_images():
+import argparse
+def capture_calibration_images(robot_type: str):
     # Create directory for calibration images if it doesn't exist
     if not os.path.exists('calibration_images'):
         os.makedirs('calibration_images')
 
     # Initialize camera
     camera = BaslerCamera()
-    camera.connect_by_ip("192.168.137.107")
-    camera.connect_by_name("camera-crs93")
+    if robot_type == "crs93":
+        camera.connect_by_ip("192.168.137.107")
+        camera.connect_by_name("camera-crs93")
+    elif robot_type == "crs97":
+        camera.connect_by_ip("192.168.137.106")
+        camera.connect_by_name("camera-crs97")
+    elif robot_type == "rv6s":
+        camera.connect_by_ip("192.168.137.109")
+        camera.connect_by_name("camera-rv6s")
+    else:
+        raise ValueError(f"Invalid robot type: {robot_type}")
     camera.open()
     camera.set_parameters()
 
@@ -56,9 +65,12 @@ def capture_calibration_images():
         cv2.destroyAllWindows()
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--robot_type", type=str, default="rv6s", help="Type of the robot")
+    args = parser.parse_args()
     print("This script will capture 15 images for camera calibration.")
     print("Position the calibration grid and press Enter for each capture.")
     print("Try to capture the grid from different angles and positions.")
     print("\nPress Enter to start capturing...")
     input()
-    capture_calibration_images() 
+    capture_calibration_images(args.robot_type) 

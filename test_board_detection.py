@@ -12,7 +12,8 @@ detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
 # Load and process image
 # img = cv2.imread("images/capture_20241215_151731.png")
 # img = cv2.imread("images/capture_20241215_173518.png")
-img = cv2.imread("images/capture_20241215_173530.png")
+# img = cv2.imread("images/capture_20241215_173530.png")
+img = cv2.imread("images/capture_20241219_174515.png")
 
 if img is None:
     raise FileNotFoundError("Test image not found")
