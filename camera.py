@@ -80,15 +80,25 @@ class Camera():
     def close(self):
         self.camera.close()
 
-    @staticmethod
-    def display_image(image: np.ndarray, window_name: str = "Image") -> None:
-        """Display an image in a cv2 window. Wait for 'q' key to close.
+    def display_image(self, img):
+        """Display image in a window with controlled size and position.
+        Wait for 'q' key to close.
         
         Args:
-            image: Image to display
-            window_name: Name of the window
+            img: Image to display
         """
-        cv2.imshow(window_name, image)
+        # Create window and set its position to top-left corner
+        window_name = "Camera View"
+        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+        cv2.moveWindow(window_name, 0, 0)
+        
+        # Set window size explicitly
+        display_width = 1200  # Adjust this value as needed
+        height, width = img.shape[:2]
+        display_height = int(height * (display_width / width))
+        cv2.resizeWindow(window_name, display_width, display_height)
+        
+        cv2.imshow(window_name, img)
         
         while True:
             key = cv2.waitKey(1) & 0xFF
@@ -167,10 +177,12 @@ class Camera():
         fig = plt.figure(figsize=(10, 10))
         ax = fig.add_subplot(111, projection='3d')
         
-        transforms["Camera"] = SE3()
+        # transforms["Camera"] = SE3()
 
         # Draw each transform
         for label, transform in transforms.items():
+            if transform is None:
+                continue
             # Plot origin point
             ax.scatter(*transform.translation, marker='o', label=label)
             

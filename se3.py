@@ -69,9 +69,25 @@ class SE3:
         )
 
     @staticmethod
-    def from_matrix(matrix: ArrayLike) -> SE3:
+    def from_matrix(matrix: ArrayLike, unit: str = "meters") -> SE3:
         """Create an SE3 transformation from a 4x4 matrix."""
-        return SE3(translation=matrix[:3, 3], rotation=SO3(matrix[:3, :3]))
+        if unit == "meters":
+            translation = matrix[:3, 3] * 1000
+        else:
+            translation = matrix[:3, 3]
+        return SE3(translation=translation, rotation=SO3(matrix[:3, :3]))
+
+    def to_matrix(self, unit: str = "meters") -> np.ndarray:
+        """Convert the transformation to a 4x4 matrix."""
+        if unit == "meters":
+            translation = self.translation / 1000
+        else:
+            translation = self.translation
+
+        matrix = np.eye(4)
+        matrix[:3, :3] = self.rotation.rot
+        matrix[:3, 3] = translation
+        return matrix
 
     def __hash__(self):
         return id(self)
