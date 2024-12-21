@@ -68,6 +68,11 @@ class SE3:
             and self.rotation == other.rotation
         )
 
+    @staticmethod
+    def from_matrix(matrix: ArrayLike) -> SE3:
+        """Create an SE3 transformation from a 4x4 matrix."""
+        return SE3(translation=matrix[:3, 3], rotation=SO3(matrix[:3, :3]))
+
     def __hash__(self):
         return id(self)
 

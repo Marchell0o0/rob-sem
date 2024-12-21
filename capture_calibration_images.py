@@ -4,27 +4,17 @@ from basler_camera import BaslerCamera
 import os
 from datetime import datetime
 import argparse
-def capture_calibration_images(robot_type: str):
+from camera import Camera
+from robot_box import RobotType
+
+
+def capture_calibration_images(robot_type: RobotType):
     # Create directory for calibration images if it doesn't exist
     if not os.path.exists('calibration_images'):
         os.makedirs('calibration_images')
 
     # Initialize camera
-    camera = BaslerCamera()
-    if robot_type == "crs93":
-        camera.connect_by_ip("192.168.137.107")
-        camera.connect_by_name("camera-crs93")
-    elif robot_type == "crs97":
-        camera.connect_by_ip("192.168.137.106")
-        camera.connect_by_name("camera-crs97")
-    elif robot_type == "rv6s":
-        camera.connect_by_ip("192.168.137.109")
-        camera.connect_by_name("camera-rv6s")
-    else:
-        raise ValueError(f"Invalid robot type: {robot_type}")
-    camera.open()
-    camera.set_parameters()
-
+    camera = Camera(robot_type)
     try:
         captured_frames = 0
         required_frames = 15
@@ -48,7 +38,7 @@ def capture_calibration_images(robot_type: str):
                     # Save image
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     filename = f"calibration_images/calib_{captured_frames + 1:02d}_{timestamp}.png"
-                    cv2.imwrite(filename, img)
+                    Camera.save_image(img, filename)
                     print(f"Saved image as: {filename}")
                     captured_frames += 1
                     break
@@ -66,11 +56,11 @@ def capture_calibration_images(robot_type: str):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--robot_type", type=str, default="rv6s", help="Type of the robot")
+    parser.add_argument("--robot-type", type=str, default="rv6s", help="Type of the robot")
     args = parser.parse_args()
     print("This script will capture 15 images for camera calibration.")
     print("Position the calibration grid and press Enter for each capture.")
     print("Try to capture the grid from different angles and positions.")
     print("\nPress Enter to start capturing...")
     input()
-    capture_calibration_images(args.robot_type) 
+    capture_calibration_images(RobotType[args.robot_type]) 
