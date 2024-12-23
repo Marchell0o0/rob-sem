@@ -56,7 +56,7 @@ def capture_calibration_images(robot_type: RobotType):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--robot-type", type=str, default="rv6s", help="Type of the robot")
+    parser.add_argument("--robot-type", type=str, default="RV6S", help="Type of the robot")
     args = parser.parse_args()
     print("This script will capture 15 images for camera calibration.")
     print("Position the calibration grid and press Enter for each capture.")

@@ -111,7 +111,7 @@ class BaslerCamera:
         """
         self.camera.Gamma.SetValue(self.gamma)
         self.camera.GainAuto.SetValue("Off")
-        self.camera.Gain.SetValue(int(self.gain))
+        self.camera.GainRaw.SetValue(int(self.gain))
         if self.exposure_time > 0:
             self.camera.ExposureAuto.SetValue("Off")
             self.camera.ExposureTime.SetValue(self.exposure_time)

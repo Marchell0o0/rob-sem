@@ -1,9 +1,12 @@
 from basler_camera import BaslerCamera
 import cv2
 import numpy as np
+import os
 from so3 import SO3
 from se3 import SE3
 from enums import RobotType
+
+
 class Camera():
     def __init__(self, robot_type: RobotType):
         self.camera = BaslerCamera()
@@ -23,10 +26,13 @@ class Camera():
         self.camera.open()
         self.camera.set_parameters()
 
-        self.camera_matrix = np.load("calibration/camera_matrix.npy")
-        self.dist_coeffs = np.load("calibration/dist_coeffs.npy")
-        assert self.camera_matrix is not None
-        assert self.dist_coeffs is not None
+        self.camera_matrix = None
+        if os.path.exists("calibration/camera_matrix.npy"):
+            self.camera_matrix = np.load("calibration/camera_matrix.npy")
+        self.dist_coeffs = None
+        if os.path.exists("calibration/dist_coeffs.npy"):
+            self.dist_coeffs = np.load("calibration/dist_coeffs.npy")
+
 
     def grab_image(self):
         return self.camera.grab_image()
@@ -124,6 +130,28 @@ class Camera():
             
         return img_copy
 
+    def project_point(self, point_3d):
+        """Project a 3D point to 2D image coordinates using camera matrix.
+        
+        Args:
+            point_3d: 3D point in camera coordinates [x, y, z]
+            
+        Returns:
+            2D point in image coordinates [x, y]
+        """
+        # Reshape point for cv2.projectPoints
+        points_3d = np.float32([[point_3d]])
+        
+        # Get rotation and translation vectors (zero for camera frame)
+        rvec = np.zeros(3)
+        tvec = np.zeros(3)
+        
+        # Project points
+        points_2d, _ = cv2.projectPoints(points_3d, rvec, tvec, 
+                                       self.camera_matrix, self.dist_coeffs)
+        
+        return points_2d[0][0]
+
     def draw_transform(self, image: np.ndarray, transform: SE3, label: str, 
                       axis_length: float = 30.0) -> np.ndarray:
         """Draw a single SE3 transform on the image (must be in camera reference frame).
@@ -137,6 +165,9 @@ class Camera():
         Returns:
             Image with drawn transform
         """
+        if transform is None:
+            return image
+        
         img_copy = image.copy()
         
         # Get rotation and translation
@@ -144,28 +175,32 @@ class Camera():
         tvec = transform.translation
         
         # Draw coordinate axes
-        cv2.drawFrameAxes(img_copy, self.camera_matrix, self.dist_coeffs, rvec, tvec, axis_length)
+        cv2.drawFrameAxes(img_copy, self.camera_matrix, self.dist_coeffs, 
+                          rvec, tvec, axis_length)
         
-        # Project center to image
-        center_3d = np.float32([[0., 0., 0.]]).reshape(-1, 3)
-        center_2d, _ = cv2.projectPoints(center_3d, rvec, tvec, self.camera_matrix, self.dist_coeffs)
-        center_2d = tuple(map(int, center_2d[0, 0]))
+        # Project origin point to get text position
+        point_2d = self.project_point(transform.translation)
+        
+        # Ensure coordinates are integers and in the correct format
+        x = int(round(float(point_2d[0])))
+        y = int(round(float(point_2d[1])))
+        
+        # Make sure coordinates are within image bounds
+        height, width = image.shape[:2]
+        x = max(0, min(x, width - 1))
+        y = max(0, min(y, height - 1))
+        
+        # Create proper tuple for text position
+        text_pos = (x, y)
         
         # Draw label
-        text_pos = (center_2d[0] + 10, center_2d[1] + 10)
         cv2.putText(img_copy, label, text_pos, 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-        
-        # Add translation information below
-        trans_text = f"x:{transform.translation[0]:.1f} y:{transform.translation[1]:.1f} z:{transform.translation[2]:.1f}"
-        text_pos = (text_pos[0], text_pos[1] + 20)
-        cv2.putText(img_copy, trans_text, text_pos,
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
         
         return img_copy
 
     @staticmethod
-    def display_transforms_3d(transforms: dict[str, SE3]) -> None:
+    def display_transforms_3d(transforms: dict[str, SE3], show_camera: bool = True) -> None:
         """Display SE3 transforms in 3D plot. Close with 'q' key.
         
         Args:
@@ -177,7 +212,8 @@ class Camera():
         fig = plt.figure(figsize=(10, 10))
         ax = fig.add_subplot(111, projection='3d')
         
-        # transforms["Camera"] = SE3()
+        if show_camera:
+            transforms["Camera"] = SE3()
 
         # Draw each transform
         for label, transform in transforms.items():
