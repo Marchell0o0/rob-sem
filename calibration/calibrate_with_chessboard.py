@@ -3,7 +3,9 @@ import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
 import argparse
-from perception_utils import viz_calibration, viz_calibration_boards
+from src.scene3d import Scene3D
+from src.se3 import SE3
+from src.so3 import SO3
 
 
 def calibrate_camera(
@@ -49,7 +51,7 @@ def calibrate_camera(
 
     # Process each image
     for i, fname in enumerate(images):
-        print(f"\nProcessing image {i}: {fname}")
+        print(f"Processing image {i + 1}: {fname}")
 
         img = cv2.imread(str(fname))
         if img is None:
@@ -97,16 +99,6 @@ def calibrate_camera(
                 plt.title(f'Calibration Image {i} with Corner Coordinates')
                 plt.axis('off')
                 plt.show()
-
-            pattern_width_px = np.linalg.norm(
-                corners[CHECKERBOARD[1]-1] - corners[0])
-            pattern_height_px = np.linalg.norm(corners[-1] - corners[0])
-            perspective_ratio = (
-                pattern_height_px/CHECKERBOARD[0]) / (pattern_width_px/CHECKERBOARD[1])
-
-            print(f"Perspective ratio (height/width): {perspective_ratio:.2f}")
-            if perspective_ratio > 1.2 or perspective_ratio < 0.8:
-                print("WARNING: Large perspective distortion detected!")
         else:
             print(f"No chessboard found in image {i}")
 
@@ -140,22 +132,35 @@ def calibrate_camera(
     np.save(output_path / 'dist_coeffs.npy', dist)
     print(f"\nCalibration results saved to {output_path}")
 
-    # Visualize calibration results - both views
-    viz_calibration(
-        corners3d,  # Original chessboard pattern
-        (board_height, board_width),
-        rvecs,  # Camera rotations
-        tvecs,  # Camera translations
-        axis_length=2.2 * square_size
-    )
+    # Create and display calibration visualization
+    scene = Scene3D().invert_z_axis()
+    scene.add_transform("Camera", SE3())
 
-    viz_calibration_boards(
-        corners3d,  # Original chessboard pattern
-        (board_height, board_width),
-        rvecs,  # Board rotations
-        tvecs,  # Board translations
-        axis_length=2.2 * square_size
-    )
+    # Add each board
+    for i, (rvec, tvec) in enumerate(zip(rvecs, tvecs)):
+        # Transform board corners to camera frame
+        R, _ = cv2.Rodrigues(rvec)
+        # Reshape to match board dimensions
+        pts = corners3d.reshape(board_width, board_height, 3)
+        pts_transformed = (R @ pts.reshape(-1, 3).T + tvec).T
+        pts_transformed = pts_transformed.reshape(board_width, board_height, 3)
+
+        # Get corner points for the board rectangle
+        board_corners = np.array([
+            pts_transformed[0, 0],             # Top-left
+            pts_transformed[0, -1],            # Top-right
+            pts_transformed[-1, -1],           # Bottom-right
+            pts_transformed[-1, 0]             # Bottom-left
+        ])
+
+        # Add board and its frame
+        scene.add_calibration_board(board_corners)
+        scene.add_transform(f"Board_{i}", SE3(
+            translation=pts_transformed.mean(axis=(0, 1)),
+            rotation=SO3(R)
+        ))
+
+    scene.display()
 
     return err, K, dist, rvecs, tvecs
 
@@ -163,7 +168,7 @@ def calibrate_camera(
 def parse_args():
     parser = argparse.ArgumentParser(
         description='Camera calibration from chessboard images')
-    parser.add_argument('--images', type=str, default='calibration_images',
+    parser.add_argument('--images', type=str, default='calibration/calibration_images',
                         help='Path to directory containing calibration images')
     parser.add_argument('--board-height', type=int, required=True,
                         help='Number of internal corners in height')
@@ -171,7 +176,7 @@ def parse_args():
                         help='Number of internal corners in width')
     parser.add_argument('--square-size', type=float, required=True,
                         help='Size of each square in mm')
-    parser.add_argument('--output-dir', type=str, default='calibration',
+    parser.add_argument('--output-dir', type=str, default='calibration/calibration_data',
                         help='Directory to save calibration results')
     parser.add_argument('--show-images', action='store_true',
                         help='Display processed images')

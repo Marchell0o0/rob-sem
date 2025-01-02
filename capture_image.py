@@ -1,7 +1,8 @@
 import cv2
 import os
-from basler_camera import BaslerCamera
+from src.basler_camera import BaslerCamera
 from datetime import datetime
+
 
 def capture_single_image(robot_type: str):
     # Create directory for images if it doesn't exist
@@ -39,6 +40,7 @@ def capture_single_image(robot_type: str):
 
     finally:
         camera.close()
+
 
 if __name__ == '__main__':
     robot_type = "rv6s"  # Change this to your desired robot type

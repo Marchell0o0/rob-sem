@@ -150,6 +150,8 @@ class SO3:
         """Compute angle axis representation from self."""
         v = self.log()
         theta = np.linalg.norm(v)
+        if theta == 0:
+            return 0, np.array([0, 0, 1])
         axis = v/theta
         return theta, axis
 

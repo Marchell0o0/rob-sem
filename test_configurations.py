@@ -11,12 +11,14 @@ box = RobotBox(robot_type=RobotType.RV6S)
 # DH parameters for RV-6S robot
 # box.robot.dh_theta_off = np.deg2rad([0, -90, -90, 0, 0, 180])  # Joint angle offset
 # box.robot.dh_a = np.array([85, 280, 100, 0, 0, 0]) / 1000.0    # Link length
-# box.robot.dh_d = np.array([350, 0, 0, 315 + 20, 0, 85 + 100]) / 1000.0    # Link offset
+# box.robot.dh_d = np.array([350, 0, 0, 315 + 20, 0, 85 + 160]) / 1000.0    # Link offset
 # box.robot.dh_alpha = np.deg2rad([-90, 0, -90, 90, -90, 0])     # Link twist
 
-box.robot.dh_theta_off = np.deg2rad([0, -90, -90, 0, 0, 180])  # Joint angle offset
+box.robot.dh_theta_off = np.deg2rad(
+    [0, -90, -90, 0, 0, 180])  # Joint angle offset
 box.robot.dh_a = np.array([85, 280, 0, 0, 0, 0]) / 1000.0    # Link length
-box.robot.dh_d = np.array([330, 0, 100, 80, 230, 230]) / 1000.0    # Link offset
+box.robot.dh_d = np.array([330, 0, 100, 80, 230, 230]
+                          ) / 1000.0    # Link offset
 box.robot.dh_alpha = np.deg2rad([-90, 0, -90, 90, -90, 0])     # Link twist
 
 
@@ -63,7 +65,8 @@ transforms["Base"] = SE3()
 q = box.robot.get_q()
 print("Home q: ", np.rad2deg(q).round())
 end_effector = SE3.from_matrix(box.robot.fk(q))
-gripper = end_effector * SE3(rotation=SO3.from_euler_angles([0, 0, (np.pi) - q[5]], ["x", "y", "z"])) * gripper_offset * SE3(rotation=SO3.from_euler_angles([0, 0, (np.pi) + q[5]], ["x", "y", "z"]))
+gripper = end_effector * SE3(rotation=SO3.from_euler_angles([0, 0, (np.pi) - q[5]], [
+                             "x", "y", "z"])) * gripper_offset * SE3(rotation=SO3.from_euler_angles([0, 0, (np.pi) + q[5]], ["x", "y", "z"]))
 
 transforms["end effector home"] = end_effector
 transforms["gripper home"] = gripper
@@ -78,7 +81,8 @@ box.robot.wait_for_motion_stop()
 q = box.robot.get_q()
 print("Turned 90 degrees q: ", np.rad2deg(q).round())
 end_effector = SE3.from_matrix(box.robot.fk(q))
-gripper = end_effector * SE3(rotation=SO3.from_euler_angles([0, 0, (np.pi ) - q[5]], ["x", "y", "z"])) * gripper_offset * SE3(rotation=SO3.from_euler_angles([0, 0, (np.pi)  + q[5]], ["x", "y", "z"]))
+gripper = end_effector * SE3(rotation=SO3.from_euler_angles([0, 0, (np.pi) - q[5]], [
+                             "x", "y", "z"])) * gripper_offset * SE3(rotation=SO3.from_euler_angles([0, 0, (np.pi) + q[5]], ["x", "y", "z"]))
 
 print("End effector: ", end_effector.translation)
 print("Gripper rotated 90 degrees: ", gripper.translation)
@@ -92,7 +96,8 @@ box.robot.wait_for_motion_stop()
 q = box.robot.get_q()
 print("Calibration q: ", np.rad2deg(q).round())
 end_effector = SE3.from_matrix(box.robot.fk(q))
-gripper = end_effector * SE3(rotation=SO3.from_euler_angles([0, 0, (np.pi ) - q[5]], ["x", "y", "z"])) * gripper_offset * SE3(rotation=SO3.from_euler_angles([0, 0, (np.pi)  + q[5]], ["x", "y", "z"]))
+gripper = end_effector * SE3(rotation=SO3.from_euler_angles([0, 0, (np.pi) - q[5]], [
+                             "x", "y", "z"])) * gripper_offset * SE3(rotation=SO3.from_euler_angles([0, 0, (np.pi) + q[5]], ["x", "y", "z"]))
 
 print("End effector: ", end_effector.translation)
 print("Calibration: ", gripper.translation)
@@ -107,7 +112,8 @@ box.robot.wait_for_motion_stop()
 q = box.robot.get_q()
 print("Calibration rotated 90 degrees q: ", np.rad2deg(q).round())
 end_effector = SE3.from_matrix(box.robot.fk(q))
-gripper = end_effector * SE3(rotation=SO3.from_euler_angles([0, 0, (np.pi)  - q[5]], ["x", "y", "z"])) * gripper_offset * SE3(rotation=SO3.from_euler_angles([0, 0, (np.pi)  + q[5]], ["x", "y", "z"]))
+gripper = end_effector * SE3(rotation=SO3.from_euler_angles([0, 0, (np.pi) - q[5]], [
+                             "x", "y", "z"])) * gripper_offset * SE3(rotation=SO3.from_euler_angles([0, 0, (np.pi) + q[5]], ["x", "y", "z"]))
 
 print("End effector: ", end_effector.translation)
 print("Calibration rotated 90 degrees: ", gripper.translation)
@@ -115,7 +121,6 @@ print("Calibration rotated 90 degrees: ", gripper.translation)
 
 transforms["end effector calibration rotated 90 degrees"] = end_effector
 transforms["gripper calibration rotated 90 degrees"] = gripper
-
 
 
 box.camera.display_transforms_3d(transforms, False)
@@ -154,7 +159,6 @@ box.close()
 # print("Gripper rotated 180 degrees: ", gripper.translation)
 
 
-
 # print(np.rad2deg(q).round())
 
 # robot.move_to_q(q)
@@ -191,7 +195,7 @@ box.close()
 # robot.stop_robot()
 
 
-# robot home pos 
+# robot home pos
 # robot pos:  [[-9.99999985e-01  1.74532924e-04 -2.22044605e-16  4.00083757e-01]
 #  [ 1.74532924e-04  9.99999985e-01  1.22464680e-16  6.43612918e-18]
 #  [ 2.22065976e-16  1.22425924e-16 -1.00000000e+00  6.44890034e-01]

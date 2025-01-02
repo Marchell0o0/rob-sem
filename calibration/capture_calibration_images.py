@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-from src.basler_camera import BaslerCamera
 import os
 from datetime import datetime
 import argparse

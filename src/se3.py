@@ -11,7 +11,7 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import ArrayLike
 
-from so3 import SO3
+from src.so3 import SO3
 
 
 class SE3:

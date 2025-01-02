@@ -1,31 +1,51 @@
-from robot_box import RobotBox, RobotType
+from src.robot_box import RobotBox
+from src.enums import RobotType
 import argparse
-from se3 import SE3
-from so3 import SO3
+from src.se3 import SE3
+from src.so3 import SO3
 import numpy as np
-
+from src.scene3d import Scene3D
 from ctu_crs import CRS93
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--robot-type", type=str, default="RV6S")
-parser.add_argument("--robot-active", action="store_true", help="Enable robot activity")
-parser.add_argument("--robot-inactive", action="store_false", dest="robot_active", 
+parser.add_argument("--robot-active", action="store_true",
+                    help="Enable robot activity")
+parser.add_argument("--robot-inactive", action="store_false", dest="robot_active",
                     help="Disable robot activity")
-parser.set_defaults(robot_active=True)
+parser.add_argument("--camera-active", action="store_true",
+                    help="Enable camera activity")
+parser.add_argument("--camera-inactive", action="store_false", dest="camera_active",
+                    help="Disable camera activity")
+parser.set_defaults(robot_active=True, camera_active=True)
 args = parser.parse_args()
 
-box = RobotBox(RobotType[args.robot_type], args.robot_active)
+box = RobotBox(RobotType[args.robot_type],
+               args.robot_active, args.camera_active)
+scene = Scene3D()
+
 
 camera_to_base = box.get_camera_to_base_transform()
-# our_camera_to_base = camera_to_base.inverse()
+if not camera_to_base:
+    print("Camera to base transform not found")
+    exit()
 
-transforms = {}
+
+boards = box.find_boards()
+if len(boards) != 2:
+    print("Didn't find 2 boards")
+    exit()
+
+for board in boards:
+    scene.add_board(board)
+scene.display()
+
 
 # transforms["Camera"] = camera_to_base
 # transforms["Our camera"] = our_camera_to_base
 
 # our_camera_in_base = SE3(translation=[450, 0, 1170]) * \
-                        # SE3(translation=[0, 0, 0], rotation=SO3.from_euler_angles(np.deg2rad([0, 180, 90]), ["x", "y", "z"]))
+# SE3(translation=[0, 0, 0], rotation=SO3.from_euler_angles(np.deg2rad([0, 180, 90]), ["x", "y", "z"]))
 # our_camera_to_base = our_camera_in_base.inverse()
 
 # boards = box.find_boards()
@@ -34,7 +54,7 @@ transforms = {}
 # if box.robot is not None:
 #     q = box.robot.get_q()
 #     robot = SE3().from_matrix(box.robot.fk(q))
-# else: 
+# else:
 #     robot = SE3().from_matrix(np.load("fk.npy"), "meters")
 
 # # transforms[f"Robot"] = our_camera_to_base * robot
@@ -71,7 +91,7 @@ transforms = {}
 #             break
 #     if not success:
 #         print("Failed to reach goal")
-            
+
 
 # box.camera.display_transforms_3d(transforms)
 

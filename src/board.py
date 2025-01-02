@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
-from se3 import SE3
-from so3 import SO3
+from src.se3 import SE3
+from src.so3 import SO3
 import csv
 import matplotlib.pyplot as plt
 
@@ -32,8 +32,50 @@ class Board:
         self.second_marker_transform = None
         self.board_transform = None
 
+        # Raw positions from CSV (x,y coordinates)
+        self.slot_positions = []
+        # Transformed slots in camera frame (index, SE3 transform)
         self.slots = []
-        self.slot_transforms = []
+
+    def _load_slot_positions(self) -> bool:
+        """Load slot positions from CSV file.
+        CSV file should be named positions_plate_XX-YY.csv where XX and YY are marker IDs.
+
+        Returns:
+            True if positions were loaded successfully
+        """
+        csv_path = f"boards/positions_plate_{self.pair[0]:02d}-{self.pair[1]:02d}.csv"
+        print(f"Loading slots from {csv_path}")
+        try:
+            with open(csv_path, 'r') as f:
+                reader = csv.reader(f)
+                # Check if first row matches this board's markers
+                header = next(reader)
+                if len(header) != 2 or int(header[0]) != self.ref_marker_id or int(header[1]) != self.second_marker_id:
+                    print(
+                        f"Header mismatch: expected {self.ref_marker_id}, {self.second_marker_id}")
+                    return False
+
+                # Load slot positions
+                self.slot_positions = []
+                for row in reader:
+                    # Convert string values to float
+                    x = float(row[0])
+                    y = float(row[1])
+                    self.slot_positions.append((x, y))
+
+                print(
+                    f"Loaded {len(self.slot_positions)} slot positions: {self.slot_positions}")
+                assert len(
+                    self.slot_positions) == 4, f"Expected 4 slots, got {len(self.slot_positions)}"
+
+                # Calculate transforms if we have marker poses
+                if self.board_transform is not None:
+                    self._calculate_slot_transforms()
+                return True
+        except (FileNotFoundError, ValueError, IndexError) as e:
+            print(f"Error loading slots: {e}")
+            return False
 
     @staticmethod
     def estimate_marker_pose(corners, camera_matrix, dist_coeffs):
@@ -67,24 +109,20 @@ class Board:
             return SE3(translation=tvec.flatten(), rotation=SO3(rotation_matrix=R))
         return None
 
-    def update_poses_from_corners(self, corners_dict, camera_matrix, dist_coeffs):
-        """Update marker poses from detected corners.
+    def update_poses(self, aruco_transforms):
+        """Update board pose from detected ArUco transforms.
 
         Args:
-            corners_dict: Dict mapping marker IDs to corner arrays
-            camera_matrix: Camera intrinsic matrix
-            dist_coeffs: Distortion coefficients
+            aruco_transforms: Dict mapping marker IDs to SE3 transforms
 
         Returns:
             True if poses were updated successfully
         """
-        if self.ref_marker_id not in corners_dict or self.second_marker_id not in corners_dict:
+        if self.ref_marker_id not in aruco_transforms or self.second_marker_id not in aruco_transforms:
             return False
 
-        self.ref_marker_transform = self.estimate_marker_pose(
-            corners_dict[self.ref_marker_id], camera_matrix, dist_coeffs)
-        self.second_marker_transform = self.estimate_marker_pose(
-            corners_dict[self.second_marker_id], camera_matrix, dist_coeffs)
+        self.ref_marker_transform = aruco_transforms[self.ref_marker_id]
+        self.second_marker_transform = aruco_transforms[self.second_marker_id]
 
         if self.ref_marker_transform is not None and self.second_marker_transform is not None:
             # Calculate board transform once
@@ -149,133 +187,6 @@ class Board:
             rotation=SO3(rotation_matrix=rotation)
         )
 
-    def draw_2d(self, img, camera_matrix, dist_coeffs, axis_length=30):
-        """Draw board visualization in 2D image."""
-        if not self.board_transform:
-            return
-
-        # Draw reference marker coordinate system
-        ref_rvec, _ = cv2.Rodrigues(self.ref_marker_transform.rotation.rot)
-        ref_tvec = self.ref_marker_transform.translation.reshape(3, 1)
-        cv2.drawFrameAxes(img, camera_matrix, dist_coeffs,
-                          ref_rvec, ref_tvec, axis_length)
-
-        # Draw second marker coordinate system
-        second_rvec, _ = cv2.Rodrigues(
-            self.second_marker_transform.rotation.rot)
-        second_tvec = self.second_marker_transform.translation.reshape(3, 1)
-        cv2.drawFrameAxes(img, camera_matrix, dist_coeffs,
-                          second_rvec, second_tvec, axis_length)
-
-        # Draw slots
-        for slot_idx, slot_transform in self.slot_transforms:
-            # Draw slot coordinate system using its aligned rotation
-            slot_rvec, _ = cv2.Rodrigues(slot_transform.rotation.rot)
-            slot_tvec = slot_transform.translation.reshape(3, 1)
-            cv2.drawFrameAxes(img, camera_matrix, dist_coeffs,
-                              slot_rvec, slot_tvec, axis_length//2)
-
-            # Project slot center
-            point_3d = np.float32([[0, 0, 0]])  # Origin in slot's frame
-            point_2d, _ = cv2.projectPoints(
-                point_3d,
-                slot_rvec, slot_tvec,
-                camera_matrix, dist_coeffs
-            )
-
-            # Convert to integer pixel coordinates
-            center = (int(round(point_2d[0][0][0])),
-                      int(round(point_2d[0][0][1])))
-            text_pos = (center[0] + 5, center[1] - 5)
-
-            # Draw circle and text
-            cv2.circle(img, center, 5, (0, 0, 255), -1)
-            cv2.putText(img, f"S{slot_idx}", text_pos,
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
-
-    def draw_3d(self, ax, marker_colors=['r', 'g']):
-        """Draw board visualization in 3D plot."""
-        if not self.board_transform:
-            return
-
-        # # Draw reference marker
-        # ref_pos = self.ref_marker_transform.translation
-        # ref_rot = self.ref_marker_transform.rotation.rot
-        # ax.scatter([ref_pos[0]], [ref_pos[1]], [ref_pos[2]],
-        #            color='r', s=100, label='Ref Marker')
-        # self.draw_3d_axes(ax, ref_pos, ref_rot, axis_length=50)
-
-        # Draw second marker
-        second_pos = self.second_marker_transform.translation
-        second_rot = self.second_marker_transform.rotation.rot
-        ax.scatter([second_pos[0]], [second_pos[1]], [second_pos[2]],
-                   color='g', s=100, label='Second Marker')
-        self.draw_3d_axes(ax, second_pos, second_rot, axis_length=50)
-
-        # Draw board
-        board_pos = self.board_transform.translation
-        board_rot = self.board_transform.rotation.rot
-        ax.scatter([board_pos[0]], [board_pos[1]], [board_pos[2]],
-                   color='b', s=100, label='Board')
-        self.draw_3d_axes(ax, board_pos, board_rot, axis_length=50)
-
-        # Draw slots with their aligned rotations
-        for slot_idx, slot_transform in self.slot_transforms:
-            slot_pos = slot_transform.translation
-            slot_rot = slot_transform.rotation.rot  # Use slot's aligned rotation
-            ax.scatter([slot_pos[0]], [slot_pos[1]], [slot_pos[2]],
-                       color='r', s=100, label=f'Slot {slot_idx}' if slot_idx == 0 else None)
-            self.draw_3d_axes(ax, slot_pos, slot_rot, axis_length=25)
-            # Add slot label
-            ax.text(slot_pos[0], slot_pos[1], slot_pos[2],
-                    f'S{slot_idx}', color='r')
-
-    @staticmethod
-    def draw_3d_axes(ax, pos, rot, axis_length=50):
-        """Draw coordinate axes in 3D plot."""
-        # Draw axes
-        for i, (color, label) in enumerate(zip(['r', 'g', 'b'], ['X', 'Y', 'Z'])):
-            ax.quiver(pos[0], pos[1], pos[2],
-                      axis_length * rot[0, i],
-                      axis_length * rot[1, i],
-                      axis_length * rot[2, i],
-                      color=color, label=label if pos[2] < 0 else None)
-
-    def load_slot_positions(self, csv_path: str) -> bool:
-        """Load slot positions from CSV file and calculate their transforms.
-        First row contains ArUco marker IDs and should be skipped.
-        CSV coordinates are used directly as they are in board coordinate system.
-
-        Args:
-            csv_path: Path to CSV file containing slot positions
-
-        Returns:
-            True if positions were loaded successfully for this board
-        """
-        if not self.ref_marker_transform or not self.second_marker_transform:
-            return False
-
-        try:
-            with open(csv_path, 'r') as f:
-                reader = csv.reader(f)
-                # Check if first row matches this board's markers
-                header = next(reader)
-                if len(header) != 2 or int(header[0]) != self.ref_marker_id or int(header[1]) != self.second_marker_id:
-                    return False
-
-                # Load slot positions
-                self.slots = []
-                for row in reader:
-                    # Convert string values to float
-                    x = float(row[0])
-                    y = float(row[1])
-                    self.slots.append((x, y))
-                # Calculate transforms once
-                self._calculate_slot_transforms()
-                return True
-        except (FileNotFoundError, ValueError, IndexError):
-            return False
-
     def _calculate_slot_transforms(self):
         """Calculate transforms for all slots in camera frame.
         After transforming to camera frame, aligns slot coordinate systems 
@@ -284,8 +195,9 @@ class Board:
         - Y axis pointing down (green)
         - Z axis pointing out of plane (blue)
         """
-        self.slot_transforms = []
-        if not self.slots:
+        self.slots = []
+        if not self.slot_positions:
+            print("No slot positions loaded!")
             return
 
         # Get reference marker axes in camera frame
@@ -293,7 +205,7 @@ class Board:
         ref_y = self.ref_marker_transform.rotation.rot[:, 1]  # Down
         ref_z = self.ref_marker_transform.rotation.rot[:, 2]  # Out
 
-        for i, (x, y) in enumerate(self.slots):
+        for i, (x, y) in enumerate(self.slot_positions):
             # First create slot transform in board coordinates
             slot_transform = SE3(translation=np.array([x, y, 0]))
 
@@ -323,32 +235,73 @@ class Board:
             if np.dot(y_axis, ref_y) < 0:
                 y_axis = -y_axis
 
-            # Create new rotation matrix with aligned axes
+            # Ensure axes are orthogonal
+            # First normalize x_axis
+            x_axis = x_axis / np.linalg.norm(x_axis)
+
+            # Make y_axis perpendicular to x_axis
+            y_axis = y_axis - np.dot(y_axis, x_axis) * x_axis
+            y_axis = y_axis / np.linalg.norm(y_axis)
+
+            # Calculate z_axis as cross product to ensure right-hand rule
+            z_axis = np.cross(x_axis, y_axis)
+            z_axis = z_axis / np.linalg.norm(z_axis)
+
+            # Verify orthogonality
+            xy_dot = abs(np.dot(x_axis, y_axis))
+            yz_dot = abs(np.dot(y_axis, z_axis))
+            xz_dot = abs(np.dot(x_axis, z_axis))
+
+            orthogonality_threshold = 1e-10
+            if xy_dot > orthogonality_threshold or yz_dot > orthogonality_threshold or xz_dot > orthogonality_threshold:
+                print(f"Warning: Axes not orthogonal for slot {i}")
+                print(f"xy_dot: {xy_dot}, yz_dot: {yz_dot}, xz_dot: {xz_dot}")
+                continue
+
+            # Create new rotation matrix with aligned and orthogonal axes
             aligned_rot = np.column_stack([x_axis, y_axis, z_axis])
+
+            # Verify rotation matrix is proper (det = 1)
+            det = np.linalg.det(aligned_rot)
+            if not np.isclose(abs(det), 1.0, rtol=1e-5):
+                print(
+                    f"Warning: Invalid rotation matrix for slot {i}, determinant = {det}")
+                continue
 
             # Create new transform with aligned rotation
             aligned_transform = SE3(
                 translation=slot_camera_transform.translation,
                 rotation=SO3(rotation_matrix=aligned_rot)
             )
+            aligned_transform = aligned_transform * SE3(translation=np.array([0, 0, 0]),
+                                                        rotation=SO3.from_euler_angles(np.deg2rad([180, 0, 0]), ["x", "y", "z"]))
 
-            self.slot_transforms.append((i, aligned_transform))
+            self.slots.append((i, aligned_transform))
+
+        assert len(
+            self.slots) == 4, f"Expected 4 slot transforms, got {len(self.slots)}"
 
     @classmethod
-    def create_boards_from_markers(cls, marker_ids: list) -> list:
-        """Create board instances from detected marker IDs.
+    def create_boards_from_transforms(cls, aruco_transforms: dict) -> list:
+        """Create board instances from detected ArUco transforms.
 
         Args:
-            marker_ids: List of detected marker IDs
+            aruco_transforms: Dict mapping marker IDs to SE3 transforms
 
         Returns:
-            List of Board instances that can be created from the detected markers
+            List of Board instances
         """
-        marker_ids = set(marker_ids)
+        marker_ids = set(aruco_transforms.keys())
+        print(f"Detected markers: {marker_ids}")
         boards = []
 
         for pair in cls.VALID_PAIRS:
             if pair[0] in marker_ids and pair[1] in marker_ids:
-                boards.append(cls(pair[0], pair[1]))
+                print(f"Creating board for pair {pair}")
+                board = cls(pair[0], pair[1])
+                if board.update_poses(aruco_transforms):
+                    # Load slot positions after board transform is calculated
+                    board._load_slot_positions()
+                    boards.append(board)
 
         return boards
