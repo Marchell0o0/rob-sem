@@ -37,6 +37,8 @@ class Board:
         # Transformed slots in camera frame (index, SE3 transform)
         self.slots = []
 
+        self.empty = None
+
     def _load_slot_positions(self) -> bool:
         """Load slot positions from CSV file.
         CSV file should be named positions_plate_XX-YY.csv where XX and YY are marker IDs.

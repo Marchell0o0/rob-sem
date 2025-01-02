@@ -219,3 +219,85 @@ class CameraImage:
                 color=(0, 0, 255)  # Red for slots
             )
         return self
+
+    def mark_boards_empty(self, boards: list[Board]) -> 'CameraImage':
+        """Mark boards as empty or full based on circle detection in slots.
+        A board is considered empty if it has more visible circles (empty slots).
+
+        Args:
+            boards: List of boards to analyze
+
+        Returns:
+            self for chaining
+        """
+        if len(boards) != 2:
+            print("Expected exactly 2 boards")
+            return self
+
+        # Convert to grayscale for circle detection
+        gray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+
+        # Count circles in each board's slots
+        board_circles = []
+        for board in boards:
+            circles_count = 0
+            for slot_idx, slot_transform in board.slots:
+                # Project slot center to image coordinates
+                slot_center = self.project_point(slot_transform.translation)
+                x, y = int(slot_center[0]), int(slot_center[1])
+
+                # Extract region around slot
+                roi_size = 70
+                roi = gray[max(0, y-roi_size):min(gray.shape[0], y+roi_size),
+                           max(0, x-roi_size):min(gray.shape[1], x+roi_size)]
+
+                # Preprocess
+                blurred = cv2.GaussianBlur(roi, (3, 3), 0)
+                _, thresh = cv2.threshold(
+                    blurred, 200, 255, cv2.THRESH_BINARY_INV)
+
+                # Create visualization
+                debug_img = cv2.cvtColor(roi, cv2.COLOR_GRAY2BGR)
+
+                circle_detected = False
+                # Contour Analysis
+                contours, _ = cv2.findContours(
+                    thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+                for contour in contours:
+                    area = cv2.contourArea(contour)
+                    if area > 200 and area < 10000:
+                        perimeter = cv2.arcLength(contour, True)
+                        circularity = 4 * np.pi * \
+                            area / (perimeter * perimeter)
+
+                        if circularity > 0.7:
+                            # Get contour center
+                            M = cv2.moments(contour)
+                            if M["m00"] != 0:
+                                circle_detected = True
+                                # Draw on main image
+                                (x_c, y_c), radius = cv2.minEnclosingCircle(contour)
+                                center = (int(x_c + max(0, x-roi_size)),
+                                          int(y_c + max(0, y-roi_size)))
+                                cv2.circle(self.image, center, int(
+                                    radius), (0, 255, 0), 2)
+
+                if circle_detected:
+                    circles_count += 1
+
+            board_circles.append((board, circles_count))
+
+        # Mark boards based on circle count
+        if len(board_circles) == 2:
+            board1, count1 = board_circles[0]
+            board2, count2 = board_circles[1]
+
+            # Board with more circles is empty
+            board1.empty = count1 > count2
+            board2.empty = count2 > count1
+
+            print(f"Board {board1.pair}: {count1} circles")
+            print(f"Board {board2.pair}: {count2} circles")
+
+        return self
