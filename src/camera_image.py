@@ -256,9 +256,6 @@ class CameraImage:
                 _, thresh = cv2.threshold(
                     blurred, 200, 255, cv2.THRESH_BINARY_INV)
 
-                # Create visualization
-                debug_img = cv2.cvtColor(roi, cv2.COLOR_GRAY2BGR)
-
                 circle_detected = False
                 # Contour Analysis
                 contours, _ = cv2.findContours(
