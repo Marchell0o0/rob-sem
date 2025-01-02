@@ -162,38 +162,39 @@ class Scene3D:
             ax.add_collection3d(rect)
 
         def hover(event):
-            if event.inaxes == ax:
-                visible = False
-                for sc in scatter_points:
-                    cont, ind = sc.contains(event)
-                    if cont:
-                        pos = sc.get_offsets()[ind["ind"][0]]
-                        annot.xy = pos
-                        label, data = scatter_points[sc]
+            if event.inaxes != ax:
+                return
+            visible = False
+            for sc in scatter_points:
+                cont, ind = sc.contains(event)
+                if cont:
+                    pos = sc.get_offsets()[ind["ind"][0]]
+                    annot.xy = pos
+                    label, data = scatter_points[sc]
 
-                        if isinstance(data, SE3):
-                            angle, axis = data.rotation.to_angle_axis()
-                            text = (f"{label}\n"
-                                    f"Position:\n"
-                                    f"X: {data.translation[0]:.2f}\n"
-                                    f"Y: {data.translation[1]:.2f}\n"
-                                    f"Z: {data.translation[2]:.2f}\n"
-                                    f"Rotation:\n"
-                                    f"Angle: {np.rad2deg(angle):.1f}°\n"
-                                    f"Axis: [{axis[0]:.2f}, {axis[1]:.2f}, {axis[2]:.2f}]")
-                        else:
-                            text = (f"{label}\n"
-                                    f"X: {data[0]:.2f}\n"
-                                    f"Y: {data[1]:.2f}\n"
-                                    f"Z: {data[2]:.2f}")
+                    if isinstance(data, SE3):
+                        angle, axis = data.rotation.to_angle_axis()
+                        text = (f"{label}\n"
+                                f"Position:\n"
+                                f"X: {data.translation[0]:.2f}\n"
+                                f"Y: {data.translation[1]:.2f}\n"
+                                f"Z: {data.translation[2]:.2f}\n"
+                                f"Rotation:\n"
+                                f"Angle: {np.rad2deg(angle):.1f}°\n"
+                                f"Axis: [{axis[0]:.2f}, {axis[1]:.2f}, {axis[2]:.2f}]")
+                    else:
+                        text = (f"{label}\n"
+                                f"X: {data[0]:.2f}\n"
+                                f"Y: {data[1]:.2f}\n"
+                                f"Z: {data[2]:.2f}")
 
-                        annot.set_text(text)
-                        visible = True
-                        break
+                    annot.set_text(text)
+                    visible = True
+                    break
 
-                if visible != annot.get_visible():
-                    annot.set_visible(visible)
-                    fig.canvas.draw_idle()
+            if visible != annot.get_visible():
+                annot.set_visible(visible)
+                fig.canvas.draw_idle()
 
         def on_key(event):
             if event.key == 'q':

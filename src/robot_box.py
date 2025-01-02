@@ -62,6 +62,7 @@ class RobotBox():
             np.deg2rad([-20, 30, 130, 0, -70, -90]),
             np.deg2rad([-40, 30, 130, 0, -70, -90])
         ]
+
         self.gripper_offset = SE3(translation=[-20, 0, 160])
 
         self.aruco_to_gripper = SE3(translation=[70, 0, -30]) * \

@@ -43,5 +43,13 @@ box = RobotBox(RobotType.CRS97, robot_active=False, camera_active=False)
 
 # Show robot in home position
 print("Visualizing home position...")
-scene_robot.add_robot(box, box.robot.q_home)
-scene_robot.display()
+calibration_aruco_configurations = [
+    np.deg2rad([0, 30, 130, 0, -70, -90]),
+    np.deg2rad([20, 30, 130, 0, -70, -90]),
+    np.deg2rad([40, 30, 130, 0, -70, -90]),
+    np.deg2rad([-20, 30, 130, 0, -70, -90]),
+    np.deg2rad([-40, 30, 130, 0, -70, -90])
+]
+for config in calibration_aruco_configurations:
+    scene_robot.add_robot(box, q=config)
+    scene_robot.display()
