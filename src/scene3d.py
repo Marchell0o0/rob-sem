@@ -106,7 +106,7 @@ class Scene3D:
         - '3': View along Z axis
         - 'q': Close window
         """
-        fig = plt.figure(figsize=(16, 16))
+        fig = plt.figure(figsize=(10, 10))
         ax = fig.add_subplot(111, projection='3d')
         fig.subplots_adjust(left=0.05, right=0.95, bottom=0.05, top=0.95)
 
@@ -287,7 +287,13 @@ class Scene3D:
             pts_transformed = (R @ pts.T + tvec).T
             pts_transformed = pts_transformed.reshape(grid[1], grid[0], 3)
 
-            # Add board
+            # Add boboards = box.find_boards()
+# if len(boards) != 2:
+#     print("Didn't find 2 boards")
+#     exit()
+
+# for board in boards:
+#     scene.add_board(board)ard
             corners = np.array([
                 pts_transformed[0, 0],      # Top-left
                 pts_transformed[0, -1],     # Top-right

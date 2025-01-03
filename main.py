@@ -5,7 +5,6 @@ from src.se3 import SE3
 from src.so3 import SO3
 import numpy as np
 from src.scene3d import Scene3D
-from ctu_crs import CRS93
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--robot-type", type=str, default="RV6S")
@@ -22,23 +21,81 @@ args = parser.parse_args()
 
 box = RobotBox(RobotType[args.robot_type],
                args.robot_active, args.camera_active)
-scene = Scene3D()
 
+scene_base = Scene3D().z_from_zero()
+scene_camera = Scene3D().z_from_zero().invert_z_axis()
 
-camera_to_base = box.get_camera_to_base_transform()
+# scene.add_transform("Camera", SE3())
+# camera_to_base = box.get_camera_to_base_transform()
+# Load and fix the camera-to-base transform
+camera_to_base_matrix = np.load("calibration/calibration_data/camera_to_base.npy")
+# Invert Y axis by negating the Y column and row
+print("Matrix original: ", camera_to_base_matrix)
+# camera_to_base_matrix[0:3, 1] *= -1  # Y column
+# camera_to_base_matrix[1, 0:3] *= -1  # Y row
+# temp = camera_to_base_matrix[0, 3] 
+# camera_to_base_matrix[0,3] = camera_to_base_matrix[1, 3]
+# camera_to_base_matrix[1,3] = -temp
+# print("Matrix fixed: ", camera_to_base_matrix)
+camera_to_base = SE3().from_matrix(camera_to_base_matrix, "meters")
+
 if not camera_to_base:
     print("Camera to base transform not found")
     exit()
 
+scene_base.add_transform("Base", SE3())
+scene_base.add_transform("Camera", camera_to_base.inverse())
+scene_base.add_robot(box, box.robot.get_q())
+
+scene_camera.add_transform("Base", camera_to_base)
+scene_camera.add_transform("Camera", SE3())
 
 boards = box.find_boards()
 if len(boards) != 2:
     print("Didn't find 2 boards")
     exit()
 
+# scene.add_robot(box, box.robot.get_q())
+
+scene_configurations = Scene3D().z_from_zero()
 for board in boards:
-    scene.add_board(board)
-scene.display()
+    # scene.add_board(board)
+    for idx, slot in enumerate(board.slots):
+        scene_base.add_transform(f"Slot {idx}, board {board.pair}", camera_to_base.inverse() * slot[1])
+        scene_camera.add_transform(f"Slot {idx}, board {board.pair}", slot[1])
+
+    if board.empty:
+        destination_in_camera = board.slots[0][1]
+
+        destination_in_base = camera_to_base.inverse() * destination_in_camera
+        destination_in_base = destination_in_base * \
+            SE3(translation=[0, 0, -300]) * \
+            SE3(translation=[0, 0, 0], rotation=SO3.from_euler_angles(np.deg2rad([0, 0, -90]), ["x", "y", "z"]))
+        scene_base.add_transform("Destination", destination_in_base)
+        scene_camera.add_transform("Destination", destination_in_camera)
+
+        print("Destination in base: ", destination_in_base)
+        print("Destination matrix: ", destination_in_base.to_matrix())
+        configurations = box.robot.ik(destination_in_base.to_matrix())
+        print("Configurations: ", configurations)
+        success = False
+        for configuration in configurations:
+            scene_configurations.add_robot(box, configuration)
+
+            scene_configurations.display()
+            print("Configuration: ", configuration)
+            try:
+                box.robot.move_to_q(configuration)
+                box.robot.wait_for_motion_stop()
+                scene_base.add_robot(box, configuration)
+                success = True
+            except Exception as e:
+                print(e)
+            if success:
+                break
+
+scene_base.display()
+scene_camera.display()
 
 
 # transforms["Camera"] = camera_to_base

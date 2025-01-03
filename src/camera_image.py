@@ -79,7 +79,7 @@ class CameraImage:
         self.display_width = width
         return self
 
-    def display(self, window_name: str = "Image Scene"):
+    def display(self, window_name: str = "Image Scene", block: bool = True):
         """Display the scene.
 
         Controls:
@@ -87,6 +87,7 @@ class CameraImage:
 
         Args:
             window_name: Name of the window
+            block: If True, blocks until 'q' is pressed. If False, shows image and returns immediately.
         """
         if self.image is None:
             raise ValueError("No image set. Call set_image() first.")
@@ -102,11 +103,13 @@ class CameraImage:
 
         # Display
         cv2.imshow(window_name, self.image)
-        while True:
-            key = cv2.waitKey(1) & 0xFF
-            if key == ord('q'):
-                cv2.destroyAllWindows()
-                break
+        
+        if block:
+            while True:
+                key = cv2.waitKey(1) & 0xFF
+                if key == ord('q'):
+                    cv2.destroyAllWindows()
+                    break
 
     def draw_arucos(self, poses: dict[int, SE3], axis_length: float = 30.0) -> 'CameraImage':
         """Draw ArUco markers with their poses.
@@ -191,7 +194,6 @@ class CameraImage:
             Board.MARKER_SIZE,
             cv2.aruco.DICT_4X4_50
         )
-
         # Create boards from detected markers
         boards = Board.create_boards_from_transforms(poses)
         print(f"Found {len(boards)} boards")
@@ -221,15 +223,7 @@ class CameraImage:
         return self
 
     def mark_boards_empty(self, boards: list[Board]) -> 'CameraImage':
-        """Mark boards as empty or full based on circle detection in slots.
-        A board is considered empty if it has more visible circles (empty slots).
-
-        Args:
-            boards: List of boards to analyze
-
-        Returns:
-            self for chaining
-        """
+        """Mark boards as empty or full based on circle detection in slots."""
         if len(boards) != 2:
             print("Expected exactly 2 boards")
             return self
@@ -251,34 +245,39 @@ class CameraImage:
                 roi = gray[max(0, y-roi_size):min(gray.shape[0], y+roi_size),
                            max(0, x-roi_size):min(gray.shape[1], x+roi_size)]
 
-                # Preprocess
-                blurred = cv2.GaussianBlur(roi, (3, 3), 0)
-                _, thresh = cv2.threshold(
-                    blurred, 200, 255, cv2.THRESH_BINARY_INV)
+                # Preprocessing
+                blurred = cv2.GaussianBlur(roi, (5, 5), 0)
+                thresh = cv2.adaptiveThreshold(
+                    blurred, 
+                    255, 
+                    cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+                    cv2.THRESH_BINARY_INV,
+                    21,  # Block size
+                    5    # C constant
+                )
 
-                circle_detected = False
-                # Contour Analysis
+                # Find contours on thresholded image
                 contours, _ = cv2.findContours(
                     thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
+                circle_detected = False
                 for contour in contours:
                     area = cv2.contourArea(contour)
-                    if area > 200 and area < 10000:
+                    if area > 100 and area < 10000:  # Relaxed area constraints
                         perimeter = cv2.arcLength(contour, True)
-                        circularity = 4 * np.pi * \
-                            area / (perimeter * perimeter)
+                        circularity = 4 * np.pi * area / (perimeter * perimeter)
 
-                        if circularity > 0.7:
+                        if circularity > 0.6:  # Relaxed circularity threshold
                             # Get contour center
                             M = cv2.moments(contour)
                             if M["m00"] != 0:
                                 circle_detected = True
+                                
                                 # Draw on main image
                                 (x_c, y_c), radius = cv2.minEnclosingCircle(contour)
                                 center = (int(x_c + max(0, x-roi_size)),
-                                          int(y_c + max(0, y-roi_size)))
-                                cv2.circle(self.image, center, int(
-                                    radius), (0, 255, 0), 2)
+                                        int(y_c + max(0, y-roi_size)))
+                                cv2.circle(self.image, center, int(radius), (0, 255, 0), 2)
 
                 if circle_detected:
                     circles_count += 1
@@ -294,7 +293,7 @@ class CameraImage:
             board1.empty = count1 > count2
             board2.empty = count2 > count1
 
-            print(f"Board {board1.pair}: {count1} circles")
-            print(f"Board {board2.pair}: {count2} circles")
+            print(f"Board {board1.pair}: {count1} circles empty: {board1.empty}")
+            print(f"Board {board2.pair}: {count2} circles empty: {board2.empty}")
 
         return self

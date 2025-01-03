@@ -5,26 +5,47 @@ from src.scene3d import Scene3D
 from src.robot_box import RobotBox, RobotType
 from src.se3 import SE3
 
-# Load camera calibration
-camera_matrix = np.load("calibration/calibration_data/camera_matrix.npy")
-dist_coeffs = np.load("calibration/calibration_data/dist_coeffs.npy")
 
-# Create image scene
-image = CameraImage(camera_matrix, dist_coeffs)
-image.set_image(cv2.imread("images/capture_20241219_174515.png"))
+box = RobotBox(RobotType.RV6S)
+scene = Scene3D().z_from_zero()
 
-# Detect ArUco markers and boards
-arucos = image.get_arucos(36, cv2.aruco.DICT_4X4_50)
-boards = image.detect_boards()
-image.mark_boards_empty(boards)
+# box.robot.move_to_q(np.deg2rad([0, 90, 0, 0, 0, 0]))
+# box.robot.move_to_q(np.deg2rad([0, 0, 90, 0, 0, 0]))
+# box.robot.move_to_q(np.deg2rad([0, 30, 130, 0, -70, -90]))
+# q_soft_home = np.deg2rad([90, 0, 90, 0, 90, 0])
+q_soft_home = np.deg2rad([0, 60, 60, 0, 60, 0])
+box.robot.move_to_q(q_soft_home)
+box.robot.wait_for_motion_stop()
+print(box.robot.fk(q_soft_home))
+# box.robot.soft_home()
+# box.robot.wait_for_motion_stop()
+# q = box.robot.get_q()
+# scene.add_robot(box, q_soft_home)
+# scene.display()
+# scene.add_robot(box, np.deg2rad([0, 30, 130, 0, -70, -90]))
+# scene.display()
 
-# Draw markers and board slots
-image.draw_arucos(arucos)
-for board in boards:
-    image.draw_board_slots(board)
+
+# # Load camera calibration
+# camera_matrix = np.load("calibration/calibration_data/camera_matrix.npy")
+# dist_coeffs = np.load("calibration/calibration_data/dist_coeffs.npy")
+
+# # Create image scene
+# image = CameraImage(camera_matrix, dist_coeffs)
+# image.set_image(cv2.imread("images/capture_20241219_174515.png"))
+
+# # Detect ArUco markers and boards
+# arucos = image.get_arucos(36, cv2.aruco.DICT_4X4_50)
+# boards = image.detect_boards()
+# image.mark_boards_empty(boards)
+
+# # Draw markers and board slots
+# image.draw_arucos(arucos)
+# for board in boards:
+#     image.draw_board_slots(board)
 
 
-image.display()
+# image.display()
 
 # # Create 3D scene for camera view
 # scene_camera = Scene3D().invert_z_axis().z_from_zero()
