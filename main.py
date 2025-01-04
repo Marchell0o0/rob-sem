@@ -5,7 +5,7 @@ from src.se3 import SE3
 from src.so3 import SO3
 import numpy as np
 from src.scene3d import Scene3D
-
+import time
 parser = argparse.ArgumentParser()
 parser.add_argument("--robot-type", type=str, default="RV6S")
 parser.add_argument("--robot-active", action="store_true",
@@ -27,132 +27,167 @@ scene_camera = Scene3D().z_from_zero().invert_z_axis()
 
 # scene.add_transform("Camera", SE3())
 # camera_to_base = box.get_camera_to_base_transform()
-# Load and fix the camera-to-base transform
-camera_to_base_matrix = np.load("calibration/calibration_data/camera_to_base.npy")
-# Invert Y axis by negating the Y column and row
-print("Matrix original: ", camera_to_base_matrix)
-# camera_to_base_matrix[0:3, 1] *= -1  # Y column
-# camera_to_base_matrix[1, 0:3] *= -1  # Y row
-# temp = camera_to_base_matrix[0, 3] 
-# camera_to_base_matrix[0,3] = camera_to_base_matrix[1, 3]
-# camera_to_base_matrix[1,3] = -temp
-# print("Matrix fixed: ", camera_to_base_matrix)
-camera_to_base = SE3().from_matrix(camera_to_base_matrix, "meters")
 
-if not camera_to_base:
-    print("Camera to base transform not found")
+# # Load and fix the camera-to-base transform
+camera_to_base_matrix = np.load("calibration/calibration_data/camera_to_base.npy")
+aruco_to_flange_matrix = np.load("calibration/calibration_data/gripper_to_flange.npy")
+
+camera_to_base = SE3().from_matrix(camera_to_base_matrix, "meters")
+aruco_to_flange = SE3().from_matrix(aruco_to_flange_matrix, "meters")
+
+if not camera_to_base or not aruco_to_flange:
+    print("Camera to base or gripper to flange transform not found")
     exit()
+print("Camera to base: ", camera_to_base)
+print("Gripper to flange: ", aruco_to_flange)
+
 
 scene_base.add_transform("Base", SE3())
 scene_base.add_transform("Camera", camera_to_base.inverse())
 scene_base.add_robot(box, box.robot.get_q())
 
-scene_camera.add_transform("Base", camera_to_base)
-scene_camera.add_transform("Camera", SE3())
+flange = SE3().from_matrix(box.robot.fk(box.robot.get_q()), "meters")
+print("Flange: ", flange)
+aruco = flange * aruco_to_flange.inverse()
+print("Aruco: ", aruco)
+scene_base.add_transform("Aruco", aruco)
+
+aruco_to_gripper = SE3(translation=[90, -20, 10], rotation=SO3.from_euler_angles(np.deg2rad([0, 90, -90]), ["x", "y", "z"]))
+gripper = aruco * aruco_to_gripper
+print("Gripper: ", gripper)
+scene_base.add_transform("Gripper", gripper)
+
+flange_to_gripper = flange.inverse() * gripper
+print("Flange to gripper: ", flange_to_gripper)
+# scene_base.add_transform("Flange to gripper", flange_to_gripper)
 
 boards = box.find_boards()
 if len(boards) != 2:
     print("Didn't find 2 boards")
     exit()
 
-# scene.add_robot(box, box.robot.get_q())
-
+# # scene.add_robot(box, box.robot.get_q())
+box.robot.soft_home()
 scene_configurations = Scene3D().z_from_zero()
+source_board = None
+destination_board = None
 for board in boards:
     # scene.add_board(board)
+    if board.empty:
+        destination_board = board
+    else:
+        source_board = board
+
     for idx, slot in enumerate(board.slots):
         scene_base.add_transform(f"Slot {idx}, board {board.pair}", camera_to_base.inverse() * slot[1])
-        scene_camera.add_transform(f"Slot {idx}, board {board.pair}", slot[1])
+#         scene_camera.add_transform(f"Slot {idx}, board {board.pair}", slot[1])
+    scene_base.add_transform(f"Board {board.pair}, aruco {board.ref_marker_id}", camera_to_base.inverse() * board.ref_marker_transform)
+    scene_base.add_transform(f"Board {board.pair}, aruco {board.second_marker_id}", camera_to_base.inverse() * board.second_marker_transform)
+    
+    # if not board.empty:
+    #     path = []
 
-    if board.empty:
-        destination_in_camera = board.slots[0][1]
+    #     destination_in_camera = board.slots[2][1]
 
-        destination_in_base = camera_to_base.inverse() * destination_in_camera
-        destination_in_base = destination_in_base * \
-            SE3(translation=[0, 0, -300]) * \
-            SE3(translation=[0, 0, 0], rotation=SO3.from_euler_angles(np.deg2rad([0, 0, -90]), ["x", "y", "z"]))
-        scene_base.add_transform("Destination", destination_in_base)
-        scene_camera.add_transform("Destination", destination_in_camera)
+    #     destination_in_base = camera_to_base.inverse() * destination_in_camera
+    #     scene_base.add_transform("Destination", destination_in_base)
 
-        print("Destination in base: ", destination_in_base)
-        print("Destination matrix: ", destination_in_base.to_matrix())
-        configurations = box.robot.ik(destination_in_base.to_matrix())
-        print("Configurations: ", configurations)
-        success = False
-        for configuration in configurations:
-            scene_configurations.add_robot(box, configuration)
+    #     flange_destination = flange_to_gripper * destination_in_base
+    #     scene_base.add_transform("Flange destination", flange_destination)
 
-            scene_configurations.display()
-            print("Configuration: ", configuration)
-            try:
-                box.robot.move_to_q(configuration)
-                box.robot.wait_for_motion_stop()
-                scene_base.add_robot(box, configuration)
-                success = True
-            except Exception as e:
-                print(e)
-            if success:
-                break
+    #     path.append(flange_destination * SE3(translation=[0, 0, -100]))
+    #     path.append(flange_destination * SE3(translation=[0, 0, -10]))
+    #     path.append(flange_destination * SE3(translation=[0, 0, -100]))
 
+    #     previous_configuration = None
+
+    #     for checkpoint in path:
+    #         configurations = box.robot.ik(checkpoint.to_matrix())
+    #         print("Configurations: ", configurations)
+    #         for configuration in configurations:
+    #             if previous_configuration is not None:
+    #                 if np.allclose(previous_configuration[5], configuration[5] + 2 * np.pi) or np.allclose(previous_configuration[5], configuration[5] - 2 * np.pi):
+    #                     configuration[5] = previous_configuration[5]
+    #                     print("Using last joint rotation from previous configuration")
+    #                     continue
+
+    #             print("\nConfiguration: ", np.rad2deg(configuration).round())
+                
+    #             user_input = input("\nPress 'y' to move robot to this configuration (any other key to skip): ")
+    #             if user_input.lower() != 'y':
+    #                 print("Skipping this configuration")
+    #                 continue
+                
+    #             try:
+    #                 box.robot.move_to_q(configuration)
+    #                 box.robot.wait_for_motion_stop()
+    #                 previous_configuration = configuration
+    #                 break
+    #             except Exception as e:
+    #                 print(f"Movement failed: {e}")
+    #                 continue
 scene_base.display()
-scene_camera.display()
+exit()
+path = []
 
+cube = source_board.slots[0][1]
+cube_gripper_destination = camera_to_base.inverse() * cube
+cube_flange_destination = flange_to_gripper * cube_gripper_destination
 
-# transforms["Camera"] = camera_to_base
-# transforms["Our camera"] = our_camera_to_base
+path.append(("move", cube_flange_destination * SE3(translation=[0, 0, -100])))
+path.append(("move", cube_flange_destination * SE3(translation=[0, 0, -10])))
+path.append(("close", None))
+path.append(("move", cube_flange_destination * SE3(translation=[0, 0, -100])))
 
-# our_camera_in_base = SE3(translation=[450, 0, 1170]) * \
-# SE3(translation=[0, 0, 0], rotation=SO3.from_euler_angles(np.deg2rad([0, 180, 90]), ["x", "y", "z"]))
-# our_camera_to_base = our_camera_in_base.inverse()
+slot = destination_board.slots[1][1]
+slot_gripper_destination = camera_to_base.inverse() * slot
+slot_flange_destination = flange_to_gripper * slot_gripper_destination
 
-# boards = box.find_boards()
-# transforms = {f"Board {board.pair} Slot {slot[0]}": slot[1] for board in boards for slot in board.slots}
+path.append(("move", slot_flange_destination * SE3(translation=[0, 0, -100])))
+path.append(("move", slot_flange_destination * SE3(translation=[0, 0, -80])))
+path.append(("open", None))
+path.append(("move", slot_flange_destination * SE3(translation=[0, 0, -100])))
 
-# if box.robot is not None:
-#     q = box.robot.get_q()
-#     robot = SE3().from_matrix(box.robot.fk(q))
-# else:
-#     robot = SE3().from_matrix(np.load("fk.npy"), "meters")
+previous_configuration = box.robot.get_q()
+for action, data in path:
+    if action == "move":
+        configurations = box.robot.ik(data.to_matrix())
+        # print("Configurations: ", configurations)
+        closest_configuration = None
+        closest_distance = float('inf')
+        for configuration in configurations:
+            distance = abs(configuration[5] - previous_configuration[5])
+            if distance < closest_distance:
+                closest_distance = distance
+                closest_configuration = configuration
+        
+        print("\nConfiguration: ", np.rad2deg(closest_configuration).round())
+        user_input = input("\nPress 'y' to move robot to this configuration (any other key to skip): ")
+        if user_input.lower() != 'y':
+            exit()        
 
-# # transforms[f"Robot"] = our_camera_to_base * robot
-# transforms[f"Robot"] = camera_to_base * robot
+        try:
+            box.robot.move_to_q(closest_configuration)
+            box.robot.wait_for_motion_stop()
+            previous_configuration = closest_configuration
+        except Exception as e:
+            print(f"Movement failed: {e}")
+            exit()
 
-# transforms[f"Base"] = camera_to_base
-# # transforms["Our base"] = our_camera_to_base
+    elif action == "close":
+        user_input = input("\nPress 'y' to close gripper: ")
+        if user_input.lower() != 'y':
+            exit()
+        box.gripper.close()
+        time.sleep(2)
+    elif action == "open":
+        user_input = input("\nPress 'y' to open gripper: ")
+        if user_input.lower() != 'y':
+            exit()
+        box.gripper.open()
+        time.sleep(2)
 
-# goal_in_camera = boards[0].slots[0][1]
-
-# # goal = our_camera_to_base.inverse() * goal_in_camera
-# goal = camera_to_base.inverse() * goal_in_camera
-
-# goal = goal * SE3(translation=[0, 0, -100])
-
-# goal_matrix = goal.to_matrix("meters")
-# print("goal matrix: ", goal_matrix)
-# goal_q = CRS93().ik(goal_matrix)
-
-# # transforms[f"Goal"] = our_camera_to_base * goal
-# transforms[f"Goal"] = camera_to_base * goal
-
-# print("Possible goal configurations: ", goal_q)
-# if goal_q is not None:
-#     success = False
-#     for q in goal_q:
-#         try:
-#             box.robot.move_to_q(q)
-#             box.robot.wait_for_motion_stop()
-#             success = True
-#         except Exception as e:
-#             print(e)
-#         if success:
-#             break
-#     if not success:
-#         print("Failed to reach goal")
-
-
-# box.camera.display_transforms_3d(transforms)
-
-# # transforms_in_base = {k: our_camera_to_base.inverse() * v for k, v in transforms.items()}
-# # box.camera.display_transforms_3d(transforms_in_base)
+box.robot.soft_home()
+box.robot.wait_for_motion_stop()
 
 box.close()

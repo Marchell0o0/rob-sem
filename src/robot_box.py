@@ -6,7 +6,6 @@ import cv2
 
 from src.scene3d import Scene3D
 
-
 class RobotBox():
     def __init__(self, robot_type: RobotType, robot_active: bool = True, camera_active: bool = True):
         self.robot_type = robot_type
@@ -19,11 +18,14 @@ class RobotBox():
             self.robot = CRS97(
                 tty_dev=None if not robot_active else "/dev/null")
         elif robot_type == RobotType.RV6S:
-            from ctu_mitsubishi import Rv6s
+            from ctu_mitsubishi import Rv6s, Rv6sGripper
             self.robot = Rv6s()
+            self.gripper = Rv6sGripper()
 
         if robot_active:
             self.robot.initialize()
+
+        
 
         if camera_active:
             from src.camera import Camera
@@ -57,42 +59,42 @@ class RobotBox():
 
         self.calibration_aruco_configurations = [
             np.deg2rad([-10, 30, 130, 0, -70, -90]),
-            np.deg2rad([-10, 30, 130, 0, -70, -45]),
+            # np.deg2rad([-10, 30, 130, 0, -70, -45]),
             np.deg2rad([0, 30, 130, 0, -70, -90]),
-            np.deg2rad([0, 30, 130, 0, -70, -45]),
+            # np.deg2rad([0, 30, 130, 0, -70, -45]),
             np.deg2rad([20, 30, 130, 0, -70, -90]),
-            np.deg2rad([20, 30, 130, 0, -70, -45]),
+            # np.deg2rad([20, 30, 130, 0, -70, -45]),
 
 
             np.deg2rad([-10, 45, 115, 0, -70, -90]),
-            np.deg2rad([-10, 45, 115, 0, -70, -45]),
+            # np.deg2rad([-10, 45, 115, 0, -70, -45]),
             np.deg2rad([0, 45, 115, 0, -70, -90]),
-            np.deg2rad([0, 45, 115, 0, -70, -45]),
+            # np.deg2rad([0, 45, 115, 0, -70, -45]),
             np.deg2rad([20, 45, 115, 0, -70, -90]),
-            np.deg2rad([20, 45, 115, 0, -70, -45]),
+            # np.deg2rad([20, 45, 115, 0, -70, -45]),
 
 
             np.deg2rad([-10, 60, 100, 0, -70, -90]),
-            np.deg2rad([-10, 60, 100, 0, -70, -45]),
+            # np.deg2rad([-10, 60, 100, 0, -70, -45]),
             np.deg2rad([0, 60, 100, 0, -70, -90]),
-            np.deg2rad([0, 60, 100, 0, -70, -45]),
+            # np.deg2rad([0, 60, 100, 0, -70, -45]),
             np.deg2rad([20, 60, 100, 0, -70, -90]),
-            np.deg2rad([20, 60, 100, 0, -70, -45]),
+            # np.deg2rad([20, 60, 100, 0, -70, -45]),
 
 
             np.deg2rad([-10, 60, 100, 0, -90, -90]),
-            np.deg2rad([-10, 60, 100, 0, -90, -45]),
+            # np.deg2rad([-10, 60, 100, 0, -90, -45]),
             np.deg2rad([0, 60, 100, 0, -90, -90]),
-            np.deg2rad([0, 60, 100, 0, -90, -45]),
+            # np.deg2rad([0, 60, 100, 0, -90, -45]),
             np.deg2rad([20, 60, 100, 0, -90, -90]),
-            np.deg2rad([20, 60, 100, 0, -90, -45]),
+            # np.deg2rad([20, 60, 100, 0, -90, -45]),
         ]
 
         # self.gripper_offset = SE3(translation=[-20, 0, 160])
 
-        self.aruco_to_gripper = SE3(translation=[70, 0, -30]) * \
-            SE3(translation=[0, 0, 0], rotation=SO3.from_euler_angles(
-                np.deg2rad([0, 90, -90]), ["x", "y", "z"]))
+        # self.aruco_to_gripper = SE3(translation=[70, 0, -30]) * \
+        #     SE3(translation=[0, 0, 0], rotation=SO3.from_euler_angles(
+        #         np.deg2rad([0, 90, -90]), ["x", "y", "z"]))
 
         # # DH parameters for RV-6S robot
         # self.robot.dh_theta_off = np.deg2rad(
@@ -104,10 +106,10 @@ class RobotBox():
         # self.robot.dh_alpha = np.deg2rad(
         #     [-90, 0, -90, 90, -90, 0])     # Link twist
 
-        self.robot.dh_theta_off = np.deg2rad([0, -90, -90, 0, 0, 180])
-        self.robot.dh_a = np.array([80, 280 - 5, 100, 0, 0, 0]) / 1000.0
-        self.robot.dh_d = np.array([350-20, 0, 0, 315, 0, 85 + 165 - 5]) / 1000.0
-        self.robot.dh_alpha = np.deg2rad([-90, 0, -90, 90, -90, 0])
+        # self.robot.dh_theta_off = np.deg2rad([0, -90, -90, 0, 0, 180])
+        # self.robot.dh_a = np.array([80, 280 - 5, 100, 0, 0, 0]) / 1000.0
+        # self.robot.dh_d = np.array([350-20, 0, 0, 315, 0, 85 + 165 - 5]) / 1000.0
+        # self.robot.dh_alpha = np.deg2rad([-90, 0, -90, 90, -90, 0])
 
     def solve_AX_YB(self, a: list[SE3], b: list[SE3]) -> tuple[SE3, SE3]:
         """Solve A^iX=YB^i, return X, Y
@@ -165,7 +167,8 @@ class RobotBox():
                 continue
 
             # Get gripper pose in camera frame
-            gripper = arucos[self.CALIBRATION_ARUCO_ID] * self.aruco_to_gripper
+            # gripper = arucos[self.CALIBRATION_ARUCO_ID] * self.aruco_to_gripper
+            gripper = arucos[self.CALIBRATION_ARUCO_ID]
             gripper_poses.append(gripper)
             
             img.add_transform(f"Gripper in pose {idx + 1}", gripper)
@@ -211,8 +214,6 @@ class RobotBox():
             gripper_poses, robot_poses)
         print("Camera to base transform:", camera_to_base)
         print("Gripper to flange transform:", gripper_to_flange)
-        print(
-            "Gripper to flange should be close to identity since we pre-applied the offset")
 
         np.save("calibration/calibration_data/camera_to_base.npy", camera_to_base.to_matrix())
         np.save("calibration/calibration_data/gripper_to_flange.npy", gripper_to_flange.to_matrix())
@@ -232,6 +233,9 @@ class RobotBox():
 
         for board in boards:
             img.draw_board_slots(board)
+            # img.add_transform(f"Board {board.pair}, aruco {board.ref_marker_id}", board.ref_marker_transform)
+            # img.add_transform(f"Board {board.pair}, aruco {board.second_marker_id}", board.second_marker_transform)
+            img.add_transform(f"Board transform {board.pair}", board.board_transform)
         img.display()
 
         return boards

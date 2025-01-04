@@ -17,7 +17,7 @@ def capture_calibration_images(robot_type: RobotType):
     camera = Camera(robot_type)
     try:
         captured_frames = 0
-        required_frames = 15
+        required_frames = 30
         quit_program = False
 
         while captured_frames < required_frames and not quit_program:

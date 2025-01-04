@@ -184,18 +184,14 @@ class CameraImage:
         return poses
 
     def detect_boards(self) -> list[Board]:
-        """Detect boards in the image using ArUco markers.
-
-        Returns:
-            List of detected boards
-        """
+        """Detect boards in the image using ArUco markers."""
         # Detect ArUco markers
         poses = self.get_arucos(
             Board.MARKER_SIZE,
             cv2.aruco.DICT_4X4_50
         )
-        # Create boards from detected markers
-        boards = Board.create_boards_from_transforms(poses)
+        # Create boards from detected markers, passing both image and camera_image
+        boards = Board.create_boards_from_transforms(poses, self.image, self)
         print(f"Found {len(boards)} boards")
         return boards
 
@@ -263,7 +259,7 @@ class CameraImage:
                 circle_detected = False
                 for contour in contours:
                     area = cv2.contourArea(contour)
-                    if area > 100 and area < 10000:  # Relaxed area constraints
+                    if area > 300 and area < 10000:  # Relaxed area constraints
                         perimeter = cv2.arcLength(contour, True)
                         circularity = 4 * np.pi * area / (perimeter * perimeter)
 
