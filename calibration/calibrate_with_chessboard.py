@@ -13,41 +13,38 @@ def calibrate_camera(
     board_height: int,
     board_width: int,
     square_size: float,
+    marker_size: float,
     output_dir: str = ".",
     show_images: bool = False
 ):
     """
-    Calibrate camera using chessboard images.
+    Calibrate camera using ChArUco board images.
 
     Args:
         images_path (str): Path to directory containing calibration images
-        board_height (int): Number of internal corners in height
-        board_width (int): Number of internal corners in width
+        board_height (int): Number of squares in height
+        board_width (int): Number of squares in width
         square_size (float): Size of each square in mm
+        marker_size (float): Size of ArUco marker in mm
         output_dir (str): Directory to save calibration results
         show_images (bool): Whether to display processed images
     """
-    # Configuration
-    CHECKERBOARD = (board_height, board_width)
-    SQUARE_SIZE = square_size
+    print(f"Calibrating camera with ChArUco board of size {board_width}x{board_height} with square size {square_size}mm and marker size {marker_size}mm")
+    # Create ChArUco board
+    aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_5X5_100)
+    board = cv2.aruco.CharucoBoard((board_width, board_height), square_size, marker_size, aruco_dict)
+    params = cv2.aruco.DetectorParameters()
+    detector = cv2.aruco.ArucoDetector(aruco_dict, params)
 
     # Get calibration images
     images = sorted(Path(images_path).glob('*.png'))
     if not images:
         raise FileNotFoundError(f"No PNG images found in {images_path}")
 
-    # Create 3D points pattern
-    corners3d = np.zeros((CHECKERBOARD[0] * CHECKERBOARD[1], 3), np.float32)
-    idx = 0
-    for y in range(CHECKERBOARD[1]):
-        for x in range(CHECKERBOARD[0]):
-            corners3d[idx] = [x * SQUARE_SIZE,
-                              (CHECKERBOARD[1] - y - 1) * SQUARE_SIZE, 0]
-            idx += 1
-
     # Lists to store points
-    pts2d = []
-    pts3d = []
+    all_corners = []
+    all_ids = []
+    img_size = None
 
     # Process each image
     for i, fname in enumerate(images):
@@ -56,74 +53,57 @@ def calibrate_camera(
         img = cv2.imread(str(fname))
         if img is None:
             continue
+        
+        if img_size is None:
+            img_size = img.shape[:2]
+            
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-        success, corners = cv2.findChessboardCorners(
-            gray,
-            CHECKERBOARD,
-            cv2.CALIB_CB_ADAPTIVE_THRESH + cv2.CALIB_CB_FAST_CHECK + cv2.CALIB_CB_NORMALIZE_IMAGE
-        )
+        # Detect ChArUco markers
+        marker_corners, marker_ids, _ = detector.detectMarkers(gray)
+        print(f"Detected {len(marker_corners)} markers")
+        if marker_ids is not None:
+            # Refine and interpolate corners
+            response, charuco_corners, charuco_ids = cv2.aruco.interpolateCornersCharuco(
+                marker_corners, marker_ids, gray, board)
+            # print(f"Interpolated {len(charuco_corners)} corners")
+            print(f"Response: {response}")
+            if response > 20:  # Minimum number of corners
+                all_corners.append(charuco_corners)
+                all_ids.append(charuco_ids)
 
-        if success:
-            criteria = (cv2.TERM_CRITERIA_EPS +
-                        cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
-            corners = cv2.cornerSubPix(
-                gray, corners, (11, 11), (-1, -1), criteria)
+                if show_images:
+                    img_display = img.copy()
+                    # Draw detected markers
+                    cv2.aruco.drawDetectedMarkers(img_display, marker_corners, marker_ids)
+                    # Draw ChArUco corners
+                    cv2.aruco.drawDetectedCornersCharuco(img_display, charuco_corners, charuco_ids)
 
-            pts2d.append(corners)
-            pts3d.append(corners3d)
-
-            if show_images:
-                img_display = img.copy()
-                cv2.drawChessboardCorners(
-                    img_display, CHECKERBOARD, corners, success)
-
-                for j, (corner, point3d) in enumerate(zip(corners, corners3d)):
-                    x, y = corner.ravel()
-                    cv2.circle(img_display, (int(x), int(y)),
-                               3, (0, 255, 0), -1)
-
-                    text_2d = f"2D:({int(x)},{int(y)})"
-                    text_3d = f"3D:({int(point3d[0])},{int(point3d[1])})"
-                    text_id = f"ID: {j}"
-
-                    cv2.putText(img_display, text_2d, (int(x)-40, int(y)-5),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0, 255, 0), 1)
-                    cv2.putText(img_display, text_3d, (int(x)-40, int(y)+10),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.3, (255, 0, 0), 1)
-                    cv2.putText(img_display, text_id, (int(x)-40, int(y)+20),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0, 0, 255), 1)
-
-                plt.figure(figsize=(15, 10))
-                plt.imshow(cv2.cvtColor(img_display, cv2.COLOR_BGR2RGB))
-                plt.title(f'Calibration Image {i} with Corner Coordinates')
-                plt.axis('off')
-                plt.show()
+                    plt.figure(figsize=(15, 10))
+                    plt.imshow(cv2.cvtColor(img_display, cv2.COLOR_BGR2RGB))
+                    plt.title(f'Calibration Image {i} with ChArUco Corners')
+                    plt.axis('off')
+                    plt.show()
         else:
-            print(f"No chessboard found in image {i}")
+            print(f"No ChArUco markers found in image {i}")
 
-    if not pts2d:
-        print("No chessboard patterns found!")
+    if not all_corners:
+        print("No ChArUco patterns found!")
         return None
 
-    print(f"\nCalibrating with {len(pts2d)} images...")
-    h, w = gray.shape
+    print(f"\nCalibrating with {len(all_corners)} images...")
+    
     flags = cv2.CALIB_FIX_K3 + cv2.CALIB_ZERO_TANGENT_DIST + \
         cv2.CALIB_FIX_PRINCIPAL_POINT
 
-    err, K, dist, rvecs, tvecs = cv2.calibrateCamera(
-        pts3d, pts2d, (w, h), None, None, flags=flags
+    # Calibrate camera using ChArUco
+    err, K, dist, rvecs, tvecs = cv2.aruco.calibrateCameraCharuco(
+        all_corners, all_ids, board, img_size, None, None, flags=flags
     )
 
     print(f"\nRMS re-projection error: {err} pixels")
     print(f"Camera matrix:\n{K}")
     print(f"Distortion coefficients:\n{dist}")
-
-    for i in range(len(pts2d)):
-        imgpoints2, _ = cv2.projectPoints(
-            pts3d[i], rvecs[i], tvecs[i], K, dist)
-        error = cv2.norm(pts2d[i], imgpoints2, cv2.NORM_L2)/len(imgpoints2)
-        print(f"Image {i} error: {error} pixels")
 
     # Save calibration results
     output_path = Path(output_dir)
@@ -140,23 +120,15 @@ def calibrate_camera(
     for i, (rvec, tvec) in enumerate(zip(rvecs, tvecs)):
         # Transform board corners to camera frame
         R, _ = cv2.Rodrigues(rvec)
-        # Reshape to match board dimensions
-        pts = corners3d.reshape(board_width, board_height, 3)
-        pts_transformed = (R @ pts.reshape(-1, 3).T + tvec).T
-        pts_transformed = pts_transformed.reshape(board_width, board_height, 3)
-
-        # Get corner points for the board rectangle
-        board_corners = np.array([
-            pts_transformed[0, 0],             # Top-left
-            pts_transformed[0, -1],            # Top-right
-            pts_transformed[-1, -1],           # Bottom-right
-            pts_transformed[-1, 0]             # Bottom-left
-        ])
+        
+        # Get board corners in 3D
+        board_corners = board.getChessboardCorners()
+        pts_transformed = (R @ board_corners.T + tvec).T
 
         # Add board and its frame
-        scene.add_calibration_board(board_corners)
+        scene.add_calibration_board(pts_transformed)
         scene.add_transform(f"Board_{i}", SE3(
-            translation=pts_transformed.mean(axis=(0, 1)),
+            translation=pts_transformed.mean(axis=0),
             rotation=SO3(R)
         ))
 
@@ -167,15 +139,17 @@ def calibrate_camera(
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description='Camera calibration from chessboard images')
+        description='Camera calibration from ChArUco board images')
     parser.add_argument('--images', type=str, default='calibration/calibration_images',
                         help='Path to directory containing calibration images')
     parser.add_argument('--board-height', type=int, required=True,
-                        help='Number of internal corners in height')
+                        help='Number of squares in height')
     parser.add_argument('--board-width', type=int, required=True,
-                        help='Number of internal corners in width')
+                        help='Number of squares in width')
     parser.add_argument('--square-size', type=float, required=True,
                         help='Size of each square in mm')
+    parser.add_argument('--marker-size', type=float, required=True,
+                        help='Size of ArUco marker in mm')
     parser.add_argument('--output-dir', type=str, default='calibration/calibration_data',
                         help='Directory to save calibration results')
     parser.add_argument('--show-images', action='store_true',
@@ -190,6 +164,7 @@ if __name__ == '__main__':
         board_height=args.board_height,
         board_width=args.board_width,
         square_size=args.square_size,
+        marker_size=args.marker_size,
         output_dir=args.output_dir,
         show_images=args.show_images
     )

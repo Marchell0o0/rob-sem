@@ -4,13 +4,44 @@ from src.camera_image import CameraImage
 from src.scene3d import Scene3D
 from src.robot_box import RobotBox, RobotType
 from src.se3 import SE3
+from capture_image import capture_single_image
 
 
 box = RobotBox(RobotType.RV6S)
 scene = Scene3D().z_from_zero()
 
+# img = box.camera.grab_image()
+# arucos = img.get_arucos(29, cv2.aruco.DICT_6X6_50)
+# img.draw_arucos(arucos)
+# img.display()
+# scene.add_robot(box, box.robot.get_q())
+# scene.display()
+# exit()
+# box.gripper.open()
 # box.robot.soft_home()
-box.robot.move_to_q(box.robot.get_q() + np.deg2rad([90, 0, 0, 0, 0, 0]))
+# box.gripper.close()
+# fk = box.robot.fk(box.robot.get_q())
+# print(fk)
+# goal = [[-1, 0, 0, 0.4],
+#  [0, 1, 0, 0],
+#  [0, 0, -1, 0.300],
+#  [0, 0, 0, 1]]
+# q = box.robot.ik(goal)
+
+# box.robot.move_to_q(q[0])
+
+# q = box.robot.ik(fk)
+
+# box.robot.move_to_q(box.robot.get_q() + np.deg2rad([90, 0, 0, 0, 0, 0]))
+# num_of_imgs = 5
+# for i in range(num_of_imgs):
+    # key = input("press c to capure img:")
+    # if key == 'c':
+        # # print(f"capturing img num {i}")
+#         # img = box.camera.grab_image()
+        # img.display(window_name=f"captured {i} img")
+    # else: 
+        # print("wrong key")    
 # box.robot.wait_for_motion_stop()
 # boards = box.find_boards()
 # box.gripper.open()
@@ -82,7 +113,7 @@ box.close()
 #     np.deg2rad([0, 30, 130, 0, -70, -90]),
 #     np.deg2rad([20, 30, 130, 0, -70, -90]),
 #     np.deg2rad([40, 30, 130, 0, -70, -90]),
-#     np.deg2rad([-20, 30, 130, 0, -70, -90]),
+#     np.deg2rad([-20, 30, 130, 0, -70,rv6s -90]),
 #     np.deg2rad([-40, 30, 130, 0, -70, -90])
 # ]
 # for config in calibration_aruco_configurations:

@@ -4,7 +4,7 @@ from src.se3 import SE3
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import cv2
 from src.so3 import SO3
-from src.board import Board
+# from src.board import Board
 
 
 class Scene3D:
@@ -52,42 +52,42 @@ class Scene3D:
         self.boards.append((corners, 'gray'))
         return self
 
-    def add_board(self, board: Board):
-        """Add board and its slots to the scene.
+    # def add_board(self, board: Board):
+    #     """Add board and its slots to the scene.
 
-        Args:
-            board: Board instance with calculated slot transforms
-        """
-        # Add board reference marker
-        self.add_transform(
-            f"Board {board.pair[0]}-{board.pair[1]}",
-            board.board_transform
-        )
+    #     Args:
+    #         board: Board instance with calculated slot transforms
+    #     """
+    #     # Add board reference marker
+    #     self.add_transform(
+    #         f"Board {board.pair[0]}-{board.pair[1]}",
+    #         board.board_transform
+    #     )
 
-        # Calculate corners using board transform
-        base_pos = board.board_transform.translation
-        base_rot = board.board_transform.rotation
+    #     # Calculate corners using board transform
+    #     base_pos = board.board_transform.translation
+    #     base_rot = board.board_transform.rotation
 
-        # Move in local coordinates to get corners
-        corners = np.array([
-            base_pos,  # Origin corner
-            base_pos + base_rot.act(np.array([0, 140, 0])),  # Move in y
-            # Move in x and y
-            base_pos + base_rot.act(np.array([180, 140, 0])),
-            base_pos + base_rot.act(np.array([180, 0, 0]))  # Move in x
-        ])
+    #     # Move in local coordinates to get corners
+    #     corners = np.array([
+    #         base_pos,  # Origin corner
+    #         base_pos + base_rot.act(np.array([0, 140, 0])),  # Move in y
+    #         # Move in x and y
+    #         base_pos + base_rot.act(np.array([180, 140, 0])),
+    #         base_pos + base_rot.act(np.array([180, 0, 0]))  # Move in x
+    #     ])
 
-        # Add board rectangle
-        self.boards.append((corners, 'gray'))
+    #     # Add board rectangle
+    #     self.boards.append((corners, 'gray'))
 
-        # Add slots with smaller axis length
-        for slot_idx, slot_transform in board.slots:
-            self.add_transform(
-                f"Slot {slot_idx}, board {board.pair[0]}-{board.pair[1]}",
-                slot_transform
-            )
+    #     # Add slots with smaller axis length
+    #     for slot_idx, slot_transform in board.slots:
+    #         self.add_transform(
+    #             f"Slot {slot_idx}, board {board.pair[0]}-{board.pair[1]}",
+    #             slot_transform
+    #         )
 
-        return self
+    #     return self
 
     def set_axis_length(self, length: float):
         """Set length for coordinate axes."""

@@ -29,16 +29,16 @@ def capture_calibration_images(robot_type: RobotType):
 
             # Display image
             img.set_display_size(720)
-            print(f"\nPress Enter to capture image {captured_frames + 1}/{required_frames} (or 'q' to quit)")
+            print(f"\nPress SPACE to capture image {captured_frames + 1}/{required_frames} (or 'q' to quit)")
             
             while True:
                 img.display(block=False)  # Non-blocking display
                 key = cv2.waitKey(1) & 0xFF
                 
-                if key == ord('\r') or key == ord('\n'):  # Enter key
+                if key == ord(' '):  # Space key
                     # Save image
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    filename = f"calibration_images/calib_{captured_frames + 1:02d}_{timestamp}.png"
+                    filename = f"calibration/calibration_images/calib_{captured_frames + 1:02d}_{timestamp}.png"
                     img.save_image(filename)
                     print(f"Saved image as: {filename}")
                     captured_frames += 1
@@ -64,8 +64,8 @@ if __name__ == '__main__':
     parser.add_argument("--robot-type", type=str,
                         default="RV6S", help="Type of the robot")
     args = parser.parse_args()
-    print("This script will capture 15 images for camera calibration.")
-    print("Position the calibration grid and press Enter for each capture.")
+    print("This script will capture 30 images for camera calibration.")
+    print("Position the calibration grid and press SPACE for each capture.")
     print("Try to capture the grid from different angles and positions.")
     print("\nPress Enter to start capturing...")
     input()
