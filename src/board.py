@@ -221,6 +221,36 @@ class Board:
                 boards.append(board)
 
         return boards
+    # @classmethod
+    # def create_boards_from_transforms(cls, aruco_transforms: dict, image=None, camera_image=None) -> list:
+    #     """Create board instances from detected ArUco transforms.
+        
+    #     Args:
+    #         aruco_transforms: Dict mapping marker IDs to SE3 transforms
+    #         image: Optional camera image for board contour detection
+    #         camera_image: CameraImage instance for projection
+    #     """
+    #     marker_ids = set(aruco_transforms.keys())
+    #     print(f"Detected markers: {marker_ids}")
+    #     boards = []
+
+    #     for pair in cls.VALID_PAIRS:
+    #         if pair[0] in marker_ids and pair[1] in marker_ids:
+    #             print(f"Creating board for pair {pair}")
+    #             board = cls(pair[0], pair[1])
+    #             if image is not None and camera_image is not None:
+    #                 board.ref_marker_transform = aruco_transforms[board.ref_marker_id]
+    #                 board.second_marker_transform = aruco_transforms[board.second_marker_id]
+    #                 x_axis = board.detect_board_contour(image, camera_image)
+    #                 if x_axis is not None:
+    #                     board._calculate_board_transform(x_axis)
+    #                 else:
+    #                     print(f"Failed to detect contour for board {pair}")
+    #                     continue
+    #             board._load_slot_positions()
+    #             boards.append(board)
+
+    #     return boards
 
     def detect_board_contour(self, image, camera_image) -> np.ndarray:
         """Detect board contour and return its X axis direction."""
