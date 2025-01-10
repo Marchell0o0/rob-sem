@@ -204,7 +204,7 @@ class CameraImage:
         Returns:
             self for chaining
         """
-        for slot_idx, slot_transform in board.slots:
+        for slot_idx, slot_transform in board.slot_transforms:
             # Draw slot transform with empty label (we'll add our own label)
             self.add_transform("", slot_transform, axis_length=20.0)
 
@@ -231,7 +231,7 @@ class CameraImage:
         board_circles = []
         for board in boards:
             circles_count = 0
-            for slot_idx, slot_transform in board.slots:
+            for slot_idx, slot_transform in board.slot_transforms:
                 # Project slot center to image coordinates
                 slot_center = self.project_point(slot_transform.translation)
                 x, y = int(slot_center[0]), int(slot_center[1])
@@ -293,3 +293,30 @@ class CameraImage:
             print(f"Board {board2.pair}: {count2} circles empty: {board2.empty}")
 
         return self
+
+    def get_aruco_corners(self, dict_size: int) -> dict[int, np.ndarray]:
+        """Get corners of ArUco markers in the image.
+        
+        Args:
+            dict_size: ArUco dictionary size (e.g., cv2.aruco.DICT_4X4_50)
+            
+        Returns:
+            Dictionary mapping marker IDs to their corner coordinates
+        """
+        # Initialize ArUco detector
+        aruco_dict = cv2.aruco.getPredefinedDictionary(dict_size)
+        aruco_params = cv2.aruco.DetectorParameters()
+        detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
+        
+        # Detect markers
+        corners, ids, rejected = detector.detectMarkers(self.image)
+        
+        if ids is None:
+            return {}
+            
+        # Create dictionary of marker corners
+        corners_dict = {}
+        for marker_corners, marker_id in zip(corners, ids):
+            corners_dict[int(marker_id[0])] = marker_corners.reshape(-1, 2)
+            
+        return corners_dict

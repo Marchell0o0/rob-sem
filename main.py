@@ -25,47 +25,53 @@ box = RobotBox(RobotType[args.robot_type],
 scene_base = Scene3D().z_from_zero()
 scene_camera = Scene3D().z_from_zero().invert_z_axis()
 
-# scene.add_transform("Camera", SE3())
+scene_camera.add_transform("Camera", SE3())
 # camera_to_base = box.get_camera_to_base_transform()
 # exit()
 
 # # Load and fix the camera-to-base transform
-camera_to_base_matrix = np.load("calibration/calibration_data/camera_to_base.npy")
-gripper_to_flange_matrix = np.load("calibration/calibration_data/gripper_to_flange.npy")
+# camera_to_base_matrix = np.load("calibration/calibration_data/camera_to_base.npy")
+# gripper_to_flange_matrix = np.load("calibration/calibration_data/gripper_to_flange.npy")
 
-camera_to_base = SE3().from_matrix(camera_to_base_matrix, "meters")
+# camera_to_base = SE3().from_matrix(camera_to_base_matrix, "meters")
 
-camera_to_base = camera_to_base
+# camera_to_base = camera_to_base
 
-temp = camera_to_base.translation[0]
-camera_to_base.translation[0] = camera_to_base.translation[1]
-camera_to_base.translation[1] = temp
+# temp = camera_to_base.translation[0]
+# camera_to_base.translation[0] = camera_to_base.translation[1]
+# camera_to_base.translation[1] = temp
 
-gripper_to_flange = SE3().from_matrix(gripper_to_flange_matrix, "meters")
+# gripper_to_flange = SE3().from_matrix(gripper_to_flange_matrix, "meters")
 
-if not camera_to_base or not gripper_to_flange:
-    print("Camera to base or gripper to flange transform not found")
-    exit()
-print("Camera to base: ", camera_to_base)
-print("Gripper to flange: ", gripper_to_flange)
+# if not camera_to_base or not gripper_to_flange:
+#     print("Camera to base or gripper to flange transform not found")
+#     exit()
+# print("Camera to base: ", camera_to_base)
+# print("Gripper to flange: ", gripper_to_flange)
 
 
-scene_base.add_transform("Base", SE3())
-scene_base.add_transform("Camera", camera_to_base)
-scene_base.add_robot(box, box.robot.get_q())
+# scene_base.add_transform("Base", SE3())
+# scene_base.add_transform("Camera", camera_to_base)
+# scene_base.add_robot(box, box.robot.get_q())
 
-flange = SE3().from_matrix(box.robot.fk(box.robot.get_q()), "meters")
-print("Flange: ", flange)
+# flange = SE3().from_matrix(box.robot.fk(box.robot.get_q()), "meters")
+# print("Flange: ", flange)
 
-gripper = flange * gripper_to_flange.inverse()
-print("Gripper: ", gripper)
-scene_base.add_transform("Gripper", gripper)
+# gripper = flange * gripper_to_flange.inverse()
+# print("Gripper: ", gripper)
+# scene_base.add_transform("Gripper", gripper)
 
 # flange_to_gripper = flange.inverse() * gripper
 # print("Flange to gripper: ", flange_to_gripper)
 # # scene_base.add_transform("Flange to gripper", flange_to_gripper)
 
 boards = box.find_boards()
+for board in boards:
+    scene_camera.add_transform(f"Board {board.pair}", board.board_transform)
+    for slot_idx, slot_transform in board.slot_transforms:
+        scene_camera.add_transform(f"Slot {slot_idx}, board {board.pair}", slot_transform)
+
+scene_camera.display()
 if len(boards) != 2:
     print("Didn't find 2 boards")
     exit()

@@ -4,7 +4,7 @@ import numpy as np
 from src.enums import RobotType
 import cv2
 from src.board import Board
-
+from src.camera_image import CameraImage
 from src.scene3d import Scene3D
 
 class RobotBox():
@@ -334,26 +334,38 @@ class RobotBox():
         return camera_to_base
 
     def find_boards(self):
-        if self.robot is not None:
+        if self.robot._initialized:
             self.robot.move_to_q(np.deg2rad([90, 0, 90, 0, 90, 0]))
             self.robot.wait_for_motion_stop()
         else:
             print("No robot found")
 
-        img = self.camera.grab_image()
-        while img.image is None or img.image.size == 0:
-            img = self.camera.grab_image()
-            print("waiting for image")
+        # img = self.camera.grab_image()
+        # while img.image is None or img.image.size == 0:
+        #     img = self.camera.grab_image()
+        #     print("waiting for image")
+        img = CameraImage(self.camera.camera_matrix, self.camera.dist_coeffs).set_image(np.array(cv2.imread("boards_dataset/board_01_20250105_122115.png")))
+
+        # Get ArUco corners
+        aruco_corners = img.get_aruco_corners(self.BOARD_ARUCO_DICT)
+        # Create boards for each valid pair
+        boards = []
+        for pair in Board.VALID_PAIRS:
+            if pair[0] in aruco_corners and pair[1] in aruco_corners:
+                board = Board(pair[0], pair[1])
+                board.calculate_board_transform(aruco_corners, img.camera_matrix, img.dist_coeffs)
+                board.calculate_slot_transforms()
+                if board.board_transform is not None:
+                    boards.append(board)
 
         # boards = img.detect_boards()
-        boards = Board.detect_boards_from_image(img)
-        img.mark_boards_empty(boards)
+        # img.mark_boards_empty(boards)
 
         for board in boards:
             img.draw_board_slots(board)
-            # img.add_transform(f"Board {board.pair}, aruco {board.ref_marker_id}", board.ref_marker_transform)
-            # img.add_transform(f"Board {board.pair}, aruco {board.second_marker_id}", board.second_marker_transform)
-            img.add_transform(f"Board transform {board.pair}", board.board_transform)
+            img.add_transform(f"Board {board.pair}", board.board_transform, axis_length=300.0)
+        #     # img.add_transform(f"Board {board.pair}, aruco {board.second_marker_id}", board.second_marker_transform)
+        #     img.add_transform(f"Board transform {board.pair}", board.board_transform)
         img.display()
 
         return boards
