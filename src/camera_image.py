@@ -6,7 +6,7 @@ from src.board import Board
 
 
 class CameraImage:
-    def __init__(self, camera_matrix=None, dist_coeffs=None, display_width: int = 1920):
+    def __init__(self, camera_matrix=None, dist_coeffs=None, display_width: int = 1400):
         """Initialize empty image scene.
 
         Args:

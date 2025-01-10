@@ -7,21 +7,40 @@ from src.board import Board
 from src.camera_image import CameraImage
 from src.scene3d import Scene3D
 
+class GripperWrapper():
+    def __init__(self, gripper, robot_type) -> None:
+            self.gripper = gripper
+            self.robot_type = robot_type
+    
+    def open(self):
+        if self.robot_type == RobotType.CRS97 or self.robot_type == RobotType.CRS93:
+            self.gripper.control_position_relative(0)
+        elif self.robot_type == RobotType.RV6S:
+            self.gripper.open()
+
+    def close(self):
+        if self.robot_type == RobotType.CRS97 or self.robot_type == RobotType.CRS93:
+            self.gripper.control_positoin_relative(1.5)
+        elif self.robot_type == RobotType.RV6S:
+            self.gripper.close()
+
 class RobotBox():
     def __init__(self, robot_type: RobotType, robot_active: bool = True, camera_active: bool = True):
         self.robot_type = robot_type
         if robot_type == RobotType.CRS93:
             from ctu_crs import CRS93
             self.robot = CRS93(
-                tty_dev=None if not robot_active else "/dev/null")
+                tty_dev=None if not robot_active else "/dev/mars")
+            self.gripper = GripperWrapper(self.robot.gripper, robot_type)
         elif robot_type == RobotType.CRS97:
             from ctu_crs import CRS97
             self.robot = CRS97(
-                tty_dev=None if not robot_active else "/dev/null")
+                tty_dev=None if not robot_active else "/dev/mars")
+            self.gripper = GripperWrapper(self.robot.gripper, robot_type)
         elif robot_type == RobotType.RV6S:
             from ctu_mitsubishi import Rv6s, Rv6sGripper
             self.robot = Rv6s()
-            self.gripper = Rv6sGripper()
+            self.gripper = GripperWrapper(Rv6sGripper, robot_type)
 
         if robot_active:
             self.robot.initialize()
@@ -34,108 +53,85 @@ class RobotBox():
         else:
             self.camera = None
 
-        # CRS93
-        # self.calibration_aruco_offset = np.deg2rad([0, 10, -70, 0, 60, 176])
-        # self.gripper_to_aruco =  \
-        #       SE3(translation=[0, 0, 0], rotation=SO3.from_euler_angles(np.deg2rad([0, 0, 5]), ["x", "y", "z"])) * \
-        #       SE3(translation=[0, -70, -20]) * \
-        #       SE3(translation=[0, 0, 0], rotation=SO3.from_euler_angles([np.pi/2, 0, np.pi/2], ["x", "y", "z"])) * \
-        #       SE3(translation=[0, 0, 0], rotation=SO3.from_euler_angles(np.deg2rad([-5, 0, 0]), ["x", "y", "z"]))
-
-        # CRS97
-        # self.gripper_to_aruco = SE3(translation=[70, 33, 0])
-
         self.BOARD_ARUCO_SIZE = 36
         self.BOARD_ARUCO_DICT = cv2.aruco.DICT_4X4_50
 
-        # CRS93
-        # self.CALIBRATION_ARUCO_ID = 2
-        # self.CALIBRATION_ARUCO_SIZE = 38
-        # self.CALIBRATION_ARUCO_DICT = cv2.aruco.DICT_6X6_50
-
-        # RV6S
+        # Calibruco cube
         self.CALIBRATION_ARUCO_ID = 0
-        # self.CALIBRATION_ARUCO_SIZE = 38
         self.CALIBRATION_ARUCO_SIZE = 29
         self.CALIBRATION_ARUCO_DICT = cv2.aruco.DICT_6X6_50
+        self.calibration_aruco_configurations = []
+        levels = [np.array([0, -10, -115, 0, -55, 0]), np.array([0, -30, -110, 0, -40, 0]),
+                  np.array([0, -45, -102, 0, -33, 0])]
+        offsets = [-20, -15, -10, -5, 0 , 5, 10, 15]
+        for level in levels:
+            for offset in offsets:
+                config = level
+                config[0] = offset 
+                self.calibration_aruco_configurations.append(np.deg2rad(config))
 
-        self.calibration_aruco_configurations = [
-            np.deg2rad([-10, 30, 130, 0, -70, 0]),
-            np.deg2rad([-5, 30, 130, 0, -70, 0]),
-            np.deg2rad([0, 30, 130, 0, -70, 0]),
-            np.deg2rad([5, 30, 130, 0, -70, 0]),
-            np.deg2rad([5, 30, 130, 0, -70, 30]),
-            np.deg2rad([10, 30, 130, 0, -70, 0]),
-            np.deg2rad([15, 30, 130, 0, -70, 0]),
-            np.deg2rad([20, 30, 130, 0, -70, 0]),
-            np.deg2rad([25, 30, 130, 0, -70, 0]),
-            np.deg2rad([25, 15, 145, 0, -70, 0]),
-            np.deg2rad([20, 15, 145, 0, -70, 0]),
-            np.deg2rad([15, 15, 145, 0, -70, 0]),
-            np.deg2rad([10, 15, 145, 0, -70, 0]),
-            np.deg2rad([5, 15, 145, 0, -70, 0]),
-            np.deg2rad([5, 15, 145, 0, -70, 30]),
-            np.deg2rad([0, 15, 145, 0, -70, 0]),
-            np.deg2rad([-5, 15, 145, 0, -70, 0]),
-            np.deg2rad([-10, 15, 145, 0, -70, 0]),
-            np.deg2rad([-10, 45, 115, 0, -70, 0]),
-            np.deg2rad([-5, 45, 115, 0, -70, 0]),
-            np.deg2rad([0, 45, 115, 0, -70, 0]),
-            np.deg2rad([5, 45, 115, 0, -70, 0]),
-            np.deg2rad([5, 45, 115, 0, -70, 30]),
-            np.deg2rad([10, 45, 115, 0, -70, 0]),
-            np.deg2rad([15, 45, 115, 0, -70, 0]),
-            np.deg2rad([20, 45, 115, 0, -70, 0]),
-            np.deg2rad([25, 45, 115, 0, -70, 0]),
-            np.deg2rad([25, 45, 145, 0, -100, 0]),
-            np.deg2rad([20, 45, 145, 0, -100, 0]),
-            np.deg2rad([15, 45, 145, 0, -100, 0]),
-            np.deg2rad([10, 45, 145, 0, -100, 0]),
-            np.deg2rad([5, 45, 145, 0, -100, 0]),
-            np.deg2rad([5, 45, 145, 0, -100, -30]),
-            np.deg2rad([0, 45, 145, 0, -100, 0]),
-            np.deg2rad([-5, 45, 145, 0, -100, 0]),
-            np.deg2rad([-10, 45, 145, 0, -100, 0]),
-            np.deg2rad([-10, 60, 100, 0, -70, 0]),
-            np.deg2rad([-5, 60, 100, 0, -70, 0]),
-            np.deg2rad([0, 60, 100, 0, -70, 0]),
-            np.deg2rad([5, 60, 100, 0, -70, 0]),
-            np.deg2rad([5, 60, 100, 0, -70, -30]),
-            np.deg2rad([10, 60, 100, 0, -70, 0]),
-            np.deg2rad([15, 60, 100, 0, -70, 0]),
-            np.deg2rad([20, 60, 100, 0, -70, 0]),
-            np.deg2rad([25, 60, 100, 0, -70, 0]),
-            np.deg2rad([-10, 60, 100, 0, -90, 0]),
-            np.deg2rad([-5, 60, 100, 0, -90, 0]),
-            np.deg2rad([0, 60, 100, 0, -90, 0]),
-            np.deg2rad([5, 60, 100, 0, -90, 0]),
-            np.deg2rad([5, 60, 100, 0, -90, 0]),
-            np.deg2rad([10, 60, 100, 0, -90, 0]),
-            np.deg2rad([15, 60, 100, 0, -90, 0]),
-            np.deg2rad([20, 60, 100, 0, -90, 0]),
-            np.deg2rad([25, 60, 100, 0, -90, 0]),
-        ]
+        print(np.rad2deg(self.calibration_aruco_configurations).round()) 
 
-        # self.gripper_offset = SE3(translation=[-20, 0, 160])
 
-        # self.aruco_to_gripper = SE3(translation=[70, 0, -30]) * \
-        #     SE3(translation=[0, 0, 0], rotation=SO3.from_euler_angles(
-        #         np.deg2rad([0, 90, -90]), ["x", "y", "z"]))
+        
 
-        # # DH parameters for RV-6S robot
-        # self.robot.dh_theta_off = np.deg2rad(
-        #     [0, -90, -90, 0, 0, 180])  # Joint angle offset
-        # self.robot.dh_a = np.array(
-        #     [85, 280, 100, 0, 0, 0]) / 1000.0    # Link length
-        # self.robot.dh_d = np.array(
-        #     [350, 0, 0, 315, 0, 85]) / 1000.0    # Link offset
-        # self.robot.dh_alpha = np.deg2rad(
-        #     [-90, 0, -90, 90, -90, 0])     # Link twist
+        # self.calibration_aruco_configurations = [
+        #     np.deg2rad([-10, 30, 130, 0, -70, 0]),
+        #     np.deg2rad([-5, 30, 130, 0, -70, 0]),
+        #     np.deg2rad([0, 30, 130, 0, -70, 0]),
+        #     np.deg2rad([5, 30, 130, 0, -70, 0]),
+        #     np.deg2rad([5, 30, 130, 0, -70, 30]),
+        #     np.deg2rad([10, 30, 130, 0, -70, 0]),
+        #     np.deg2rad([15, 30, 130, 0, -70, 0]),
+        #     np.deg2rad([20, 30, 130, 0, -70, 0]),
+        #     np.deg2rad([25, 30, 130, 0, -70, 0]),
+        #     np.deg2rad([25, 15, 145, 0, -70, 0]),
+        #     np.deg2rad([20, 15, 145, 0, -70, 0]),
+        #     np.deg2rad([15, 15, 145, 0, -70, 0]),
+        #     np.deg2rad([10, 15, 145, 0, -70, 0]),
+        #     np.deg2rad([5, 15, 145, 0, -70, 0]),
+        #     np.deg2rad([5, 15, 145, 0, -70, 30]),
+        #     np.deg2rad([0, 15, 145, 0, -70, 0]),
+        #     np.deg2rad([-5, 15, 145, 0, -70, 0]),
+        #     np.deg2rad([-10, 15, 145, 0, -70, 0]),
+        #     np.deg2rad([-10, 45, 115, 0, -70, 0]),
+        #     np.deg2rad([-5, 45, 115, 0, -70, 0]),
+        #     np.deg2rad([0, 45, 115, 0, -70, 0]),
+        #     np.deg2rad([5, 45, 115, 0, -70, 0]),
+        #     np.deg2rad([5, 45, 115, 0, -70, 30]),
+        #     np.deg2rad([10, 45, 115, 0, -70, 0]),
+        #     np.deg2rad([15, 45, 115, 0, -70, 0]),
+        #     np.deg2rad([20, 45, 115, 0, -70, 0]),
+        #     np.deg2rad([25, 45, 115, 0, -70, 0]),
+        #     np.deg2rad([25, 45, 145, 0, -100, 0]),
+        #     np.deg2rad([20, 45, 145, 0, -100, 0]),
+        #     np.deg2rad([15, 45, 145, 0, -100, 0]),
+        #     np.deg2rad([10, 45, 145, 0, -100, 0]),
+        #     np.deg2rad([5, 45, 145, 0, -100, 0]),
+        #     np.deg2rad([5, 45, 145, 0, -100, -30]),
+        #     np.deg2rad([0, 45, 145, 0, -100, 0]),
+        #     np.deg2rad([-5, 45, 145, 0, -100, 0]),
+        #     np.deg2rad([-10, 45, 145, 0, -100, 0]),
+        #     np.deg2rad([-10, 60, 100, 0, -70, 0]),
+        #     np.deg2rad([-5, 60, 100, 0, -70, 0]),
+        #     np.deg2rad([0, 60, 100, 0, -70, 0]),
+        #     np.deg2rad([5, 60, 100, 0, -70, 0]),
+        #     np.deg2rad([5, 60, 100, 0, -70, -30]),
+        #     np.deg2rad([10, 60, 100, 0, -70, 0]),
+        #     np.deg2rad([15, 60, 100, 0, -70, 0]),
+        #     np.deg2rad([20, 60, 100, 0, -70, 0]),
+        #     np.deg2rad([25, 60, 100, 0, -70, 0]),
+        #     np.deg2rad([-10, 60, 100, 0, -90, 0]),
+        #     np.deg2rad([-5, 60, 100, 0, -90, 0]),
+        #     np.deg2rad([0, 60, 100, 0, -90, 0]),
+        #     np.deg2rad([5, 60, 100, 0, -90, 0]),
+        #     np.deg2rad([5, 60, 100, 0, -90, 0]),
+        #     np.deg2rad([10, 60, 100, 0, -90, 0]),
+        #     np.deg2rad([15, 60, 100, 0, -90, 0]),
+        #     np.deg2rad([20, 60, 100, 0, -90, 0]),
+        #     np.deg2rad([25, 60, 100, 0, -90, 0]),
+        # ]
 
-        # self.robot.dh_theta_off = np.deg2rad([0, -90, -90, 0, 0, 180])
-        # self.robot.dh_a = np.array([80, 280 - 5, 100, 0, 0, 0]) / 1000.0
-        # self.robot.dh_d = np.array([350-20, 0, 0, 315, 0, 85 + 165 - 5]) / 1000.0
-        # self.robot.dh_alpha = np.deg2rad([-90, 0, -90, 90, -90, 0])
 
     def solve_AX_YB(self, gripper_poses, robot_poses):
         """
@@ -340,11 +336,11 @@ class RobotBox():
         else:
             print("No robot found")
 
-        # img = self.camera.grab_image()
-        # while img.image is None or img.image.size == 0:
-        #     img = self.camera.grab_image()
-        #     print("waiting for image")
-        img = CameraImage(self.camera.camera_matrix, self.camera.dist_coeffs).set_image(np.array(cv2.imread("boards_dataset/board_01_20250105_122115.png")))
+        img = self.camera.grab_image()
+        while img.image is None or img.image.size == 0:
+            img = self.camera.grab_image()
+            print("waiting for image")
+        # img = CameraImage(self.camera.camera_matrix, self.camera.dist_coeffs).set_image(np.array(cv2.imread("boards_dataset/board_01_20250105_122115.png")))
 
         # Get ArUco corners
         aruco_corners = img.get_aruco_corners(self.BOARD_ARUCO_DICT)
@@ -359,7 +355,7 @@ class RobotBox():
                     boards.append(board)
 
         # boards = img.detect_boards()
-        # img.mark_boards_empty(boards)
+        img.mark_boards_empty(boards)
 
         for board in boards:
             img.draw_board_slots(board)

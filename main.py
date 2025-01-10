@@ -7,7 +7,7 @@ import numpy as np
 from src.scene3d import Scene3D
 import time
 parser = argparse.ArgumentParser()
-parser.add_argument("--robot-type", type=str, default="RV6S")
+parser.add_argument("--robot-type", type=str, default="CRS97")
 parser.add_argument("--robot-active", action="store_true",
                     help="Enable robot activity")
 parser.add_argument("--robot-inactive", action="store_false", dest="robot_active",
@@ -22,12 +22,21 @@ args = parser.parse_args()
 box = RobotBox(RobotType[args.robot_type],
                args.robot_active, args.camera_active)
 
+print("inited box")
+
+# for cfg in box.calibration_aruco_configurations:
+#     box.robot.move_to_q()
+
+# exit()
 scene_base = Scene3D().z_from_zero()
 scene_camera = Scene3D().z_from_zero().invert_z_axis()
 
+print("inited scene")
+
 scene_camera.add_transform("Camera", SE3())
-# camera_to_base = box.get_camera_to_base_transform()
-# exit()
+camera_to_base = box.get_camera_to_base_transform()
+print("got camera to base")
+exit()
 
 # # Load and fix the camera-to-base transform
 # camera_to_base_matrix = np.load("calibration/calibration_data/camera_to_base.npy")
@@ -67,6 +76,7 @@ scene_camera.add_transform("Camera", SE3())
 
 boards = box.find_boards()
 for board in boards:
+    print(board.board_transform)
     scene_camera.add_transform(f"Board {board.pair}", board.board_transform)
     for slot_idx, slot_transform in board.slot_transforms:
         scene_camera.add_transform(f"Slot {slot_idx}, board {board.pair}", slot_transform)
@@ -76,7 +86,6 @@ if len(boards) != 2:
     print("Didn't find 2 boards")
     exit()
 
-exit()
 # # scene.add_robot(box, box.robot.get_q())
 box.robot.soft_home()
 scene_configurations = Scene3D().z_from_zero()

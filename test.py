@@ -7,7 +7,7 @@ from src.se3 import SE3
 from capture_image import capture_single_image
 
 
-box = RobotBox(RobotType.RV6S)
+box = RobotBox(RobotType.CRS97)
 scene = Scene3D().z_from_zero()
 
 # img = box.camera.grab_image()
@@ -18,7 +18,9 @@ scene = Scene3D().z_from_zero()
 # scene.display()
 # exit()
 # box.gripper.open()
-# box.robot.soft_home()
+box.robot.soft_home()
+# box.robot.move_to_q(box.robot.get_q() + np.deg2rad([90, 0, 0, 0, 0 ,0]))
+box.robot.wait_for_motion_stop()
 # box.gripper.close()
 # fk = box.robot.fk(box.robot.get_q())
 # print(fk)
