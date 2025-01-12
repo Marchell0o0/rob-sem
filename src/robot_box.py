@@ -6,7 +6,7 @@ import cv2
 from src.board import Board
 from src.camera_image import CameraImage
 from src.scene3d import Scene3D
-
+from pathlib import Path
 class GripperWrapper():
     def __init__(self, gripper, robot_type) -> None:
             self.gripper = gripper
@@ -14,13 +14,19 @@ class GripperWrapper():
     
     def open(self):
         if self.robot_type == RobotType.CRS97 or self.robot_type == RobotType.CRS93:
-            self.gripper.control_position_relative(0)
+            self.gripper.control_position(1000)
+            self.gripper.wait_for_motion_stop()
+            self.gripper.control_position(1000)
+            self.gripper.wait_for_motion_stop()
         elif self.robot_type == RobotType.RV6S:
             self.gripper.open()
 
     def close(self):
         if self.robot_type == RobotType.CRS97 or self.robot_type == RobotType.CRS93:
-            self.gripper.control_positoin_relative(1.5)
+            self.gripper.control_position(-1000)
+            self.gripper.wait_for_motion_stop()
+            self.gripper.control_position(-1000)
+            self.gripper.wait_for_motion_stop()
         elif self.robot_type == RobotType.RV6S:
             self.gripper.close()
 
@@ -57,19 +63,34 @@ class RobotBox():
         self.BOARD_ARUCO_DICT = cv2.aruco.DICT_4X4_50
 
         # Calibruco cube
-        self.CALIBRATION_ARUCO_ID = 0
+        self.CALIBRATION_ARUCO_ID = 2
         # self.CALIBRATION_ARUCO_SIZE = 29
-        self.CALIBRATION_ARUCO_SIZE = 50
+        self.CALIBRATION_ARUCO_SIZE = 38
         self.CALIBRATION_ARUCO_DICT = cv2.aruco.DICT_6X6_50
         self.calibration_aruco_configurations = []
-        levels = [np.array([0, -10, -115, 0, -55, 0]), np.array([0, -30, -110, 0, -40, 0]),
-                  np.array([0, -45, -102, 0, -33, 0])]
-        offsets = [-20, -15, -10, -5, 0 , 5, 10, 15]
-        for level in levels:
-            for offset in offsets:
-                config = level
-                config[0] = offset 
-                self.calibration_aruco_configurations.append(np.deg2rad(config))
+
+        configurations_path = Path("only_10_both_robots")
+        for file in configurations_path.glob("*.npy"):
+            self.calibration_aruco_configurations.append(np.load(file))
+
+        # CRS93
+        # levels = [np.array([0, -10, -110, 0, -60, 0]), np.array([0, -30, -110, 0, -40, 0]),
+        #           np.array([0, -45, -102, 0, -33, 0])]
+        
+        # CRS97
+        # levels = [np.array([0, -10, -115, 0, -55, 0]), np.array([0, -30, -110, 0, -40, 0]),
+        #           np.array([0, -45, -102, 0, -33, 0])]
+
+        # offsets = [-20, -15, -10, -5, 0 , 5, 10, 15]
+        # angles = [0, 15]
+        # for level in levels:
+        #     for offset in offsets:
+        #         config = level
+        #         config[0] = offset
+        #         for angle in angles:
+        #             config[4] += angle
+        #             self.calibration_aruco_configurations.append(np.deg2rad(config))
+        #             config[4] -= angle
 
         print(np.rad2deg(self.calibration_aruco_configurations).round()) 
 
@@ -154,6 +175,10 @@ class RobotBox():
 
         # Validate and convert poses
         for gripper, robot in zip(gripper_poses, robot_poses):
+
+            print("gripper: ", gripper)
+            print("robot: ", robot)
+
             # Get rotation and translation from gripper pose
             R_g = gripper.rotation.rot
             t_g = gripper.translation.reshape(3, 1)
@@ -208,14 +233,14 @@ class RobotBox():
 
         # Perform the calibration
         try:
-            R_gf, t_gf, R_cb, t_cb = cv2.calibrateRobotWorldHandEye(
-                R_gripper, t_gripper, R_robot, t_robot,
-                cv2.CALIB_ROBOT_WORLD_HAND_EYE_SHAH
-            )
             # R_gf, t_gf, R_cb, t_cb = cv2.calibrateRobotWorldHandEye(
-            #     R_robot, t_robot, R_gripper, t_gripper,
+            #     R_gripper, t_gripper, R_robot, t_robot,
             #     cv2.CALIB_ROBOT_WORLD_HAND_EYE_SHAH
             # )
+            R_gf, t_gf, R_cb, t_cb = cv2.calibrateRobotWorldHandEye(
+                R_robot, t_robot, R_gripper, t_gripper,
+                cv2.CALIB_ROBOT_WORLD_HAND_EYE_SHAH
+            )
         except cv2.error as e:
             print("\nCalibration failed! Try collecting new calibration data with:")
             print("1. More diverse robot poses (different angles and positions)")
@@ -234,7 +259,7 @@ class RobotBox():
         )
 
         return camera_to_base, gripper_to_flange
-
+    
     def get_camera_to_base_transform(self) -> SE3 | None:
         """
         Get the transform from the camera to the base of the robot
@@ -268,26 +293,21 @@ class RobotBox():
                 self.CALIBRATION_ARUCO_SIZE, self.CALIBRATION_ARUCO_DICT)
             print(arucos)
             img.draw_arucos(arucos)
+            img.display()
 
             if self.CALIBRATION_ARUCO_ID not in arucos:
                 print(f"Calibration ArUco not found for config {config}")
                 continue
 
-            # Get gripper pose in camera frame
-            # gripper = arucos[self.CALIBRATION_ARUCO_ID] * self.aruco_to_gripper
             gripper = arucos[self.CALIBRATION_ARUCO_ID]
-            # check if transformation from gripper to aruco is correct
-            # gripper = gripper * SE3(translation=[0, 0, 0], rotation=SO3.from_euler_angles(np.deg2rad([0, 90, 0]), ["x", "y", "z"]))
-            gripper = gripper * SE3(translation=[0, 190, 0], rotation=SO3.from_euler_angles(np.deg2rad([180, 90, 0]), ["y", "z", "x"]))
             gripper_poses.append(gripper)
             
             img.add_transform(f"Gripper in pose {idx + 1}", gripper)
-            img.display()
             
             scene_camera.add_transform(f"Gripper in pose {idx + 1}", gripper)
 
             # Get robot end-effector pose in base frame
-            if not self.robot:
+            if not self.robot or not self.robot._initialized:
                 print("Can't continue without robot because of fk")
                 continue
 
@@ -328,8 +348,13 @@ class RobotBox():
         # Solve AX=YB to get camera-to-base (X) and gripper-to-flange (Y) transforms
         camera_to_base, gripper_to_flange = self.solve_AX_YB(
             gripper_poses, robot_poses)
+
+        # my_gripper_to_flange, my_camera_to_base = self.solve_robot_hand_eye_with_fixed_camera(robot_poses, gripper_poses)
         print("Camera to base transform:", camera_to_base)
         print("Gripper to flange transform:", gripper_to_flange)
+
+        # print("my_camera_to_base: ", my_camera_to_base)
+        # print("my_gripper_to_flange: ", my_gripper_to_flange)
 
         np.save("calibration/calibration_data/camera_to_base.npy", camera_to_base.to_matrix())
         np.save("calibration/calibration_data/gripper_to_flange.npy", gripper_to_flange.to_matrix())
