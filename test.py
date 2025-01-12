@@ -7,6 +7,19 @@ from src.se3 import SE3
 from capture_image import capture_single_image
 
 
+# cur fk in soft home: 
+# [[-1.41381099e-04 -1.75942261e-04  9.99999975e-01  4.43778074e-01]
+#  [ 6.59554259e-05  9.99999982e-01  1.75951587e-04  6.26756665e-05]
+#  [-9.99999988e-01  6.59803004e-05 -1.41369492e-04  8.43467930e-01]
+#  [ 0.00000000e+00  0.00000000e+00  0.00000000e+00  1.s00000000e+00]]
+
+# cur fk in [0, 0, -45, 0, -45, 0]: 
+# [[-1.41381099e-04 -1.75942261e-04  9.99999975e-01  4.43778074e-01]
+#  [ 6.59554259e-05  9.99999982e-01  1.75951587e-04  6.26756665e-05]
+#  [-9.99999988e-01  6.59803004e-05 -1.41369492e-04  8.43467930e-01]
+#  [ 0.00000000e+00  0.00000000e+00  0.00000000e+00  1.00000000e+00]]
+
+
 box = RobotBox(RobotType.CRS97)
 scene = Scene3D().z_from_zero()
 
@@ -19,8 +32,35 @@ scene = Scene3D().z_from_zero()
 # exit()
 # box.gripper.open()
 box.robot.soft_home()
-# box.robot.move_to_q(box.robot.get_q() + np.deg2rad([90, 0, 0, 0, 0 ,0]))
 box.robot.wait_for_motion_stop()
+# cur_q = box.robot.get_q()
+# cur_fk = box.robot.fk(cur_q)
+# print("cur fk in soft home:", cur_fk)
+# box.robot.move_to_q(box.robot.get_q() + np.deg2rad([-90, 0, 0, 0, 0 ,0]))
+# box.robot.move_to_q(box.robot.get_q() + np.deg2rad([0, 0, -45, 0, -45 ,0]))
+# cur_fk2 = box.robot.fk(cur_q)
+# print(f"cur fk in {[0, 0, -45, 0, -45 ,0]}:", cur_fk2)
+# box.robot.wait_for_motion_stop()
+
+
+# # from src.camera import Camera
+# # # box.camera = Camera(RobotType.CRS97)
+
+# img = None
+# img = box.camera.grab_image()
+# while img.image is None or img.image.size == 0:
+#     img = box.camera.grab_image()
+#     print("waiting for image")
+
+# arucos = img.get_arucos(
+#                 box.CALIBRATION_ARUCO_SIZE, box.CALIBRATION_ARUCO_DICT)
+# print(arucos)
+# img.draw_arucos(arucos)
+
+# img.display()
+
+
+
 # box.gripper.close()
 # fk = box.robot.fk(box.robot.get_q())
 # print(fk)

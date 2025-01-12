@@ -43,7 +43,7 @@ class RobotBox():
             self.gripper = GripperWrapper(Rv6sGripper, robot_type)
 
         if robot_active:
-            self.robot.initialize()
+            self.robot.initialize(home=False)
 
         
 
@@ -58,7 +58,8 @@ class RobotBox():
 
         # Calibruco cube
         self.CALIBRATION_ARUCO_ID = 0
-        self.CALIBRATION_ARUCO_SIZE = 29
+        # self.CALIBRATION_ARUCO_SIZE = 29
+        self.CALIBRATION_ARUCO_SIZE = 50
         self.CALIBRATION_ARUCO_DICT = cv2.aruco.DICT_6X6_50
         self.calibration_aruco_configurations = []
         levels = [np.array([0, -10, -115, 0, -55, 0]), np.array([0, -30, -110, 0, -40, 0]),
@@ -211,6 +212,10 @@ class RobotBox():
                 R_gripper, t_gripper, R_robot, t_robot,
                 cv2.CALIB_ROBOT_WORLD_HAND_EYE_SHAH
             )
+            # R_gf, t_gf, R_cb, t_cb = cv2.calibrateRobotWorldHandEye(
+            #     R_robot, t_robot, R_gripper, t_gripper,
+            #     cv2.CALIB_ROBOT_WORLD_HAND_EYE_SHAH
+            # )
         except cv2.error as e:
             print("\nCalibration failed! Try collecting new calibration data with:")
             print("1. More diverse robot poses (different angles and positions)")
@@ -271,7 +276,9 @@ class RobotBox():
             # Get gripper pose in camera frame
             # gripper = arucos[self.CALIBRATION_ARUCO_ID] * self.aruco_to_gripper
             gripper = arucos[self.CALIBRATION_ARUCO_ID]
-            gripper = gripper * SE3(translation=[0, 0, 0], rotation=SO3.from_euler_angles(np.deg2rad([0, 90, 0]), ["x", "y", "z"]))
+            # check if transformation from gripper to aruco is correct
+            # gripper = gripper * SE3(translation=[0, 0, 0], rotation=SO3.from_euler_angles(np.deg2rad([0, 90, 0]), ["x", "y", "z"]))
+            gripper = gripper * SE3(translation=[0, 190, 0], rotation=SO3.from_euler_angles(np.deg2rad([180, 90, 0]), ["y", "z", "x"]))
             gripper_poses.append(gripper)
             
             img.add_transform(f"Gripper in pose {idx + 1}", gripper)
@@ -326,6 +333,8 @@ class RobotBox():
 
         np.save("calibration/calibration_data/camera_to_base.npy", camera_to_base.to_matrix())
         np.save("calibration/calibration_data/gripper_to_flange.npy", gripper_to_flange.to_matrix())
+
+        print("saved matrices camera_to_base.npy and gripper_to_flange.npy")
 
         return camera_to_base
 
