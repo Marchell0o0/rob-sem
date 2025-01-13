@@ -69,91 +69,34 @@ class RobotBox():
         self.CALIBRATION_ARUCO_DICT = cv2.aruco.DICT_6X6_50
         self.calibration_aruco_configurations = []
 
-        configurations_path = Path("only_10_both_robots")
-        for file in configurations_path.glob("*.npy"):
-            self.calibration_aruco_configurations.append(np.load(file))
-
-        # CRS93
-        # levels = [np.array([0, -10, -110, 0, -60, 0]), np.array([0, -30, -110, 0, -40, 0]),
-        #           np.array([0, -45, -102, 0, -33, 0])]
+        self.calibration_aruco_configurations = np.deg2rad(np.array([
+            [  15.1,  -47.0, -110.1,  161.9,  -98.3,    8.0],
+            [  -6.0,  -43.1, -109.1,  156.9,  -93.9,   12.1],
+            [  -5.3,  -48.8, -110.7,  154.6,  -88.0,    9.0],
+            [ -15.9,  -42.2, -112.0,  152.9,  -94.6,   12.9],
+            [  -8.3,  -53.5,  -95.0,  153.9, -100.8,   17.1],
+            [  -2.3,  -42.1, -102.2,  164.9,  -83.4,    9.9],
+            [  15.9,  -66.9,  -84.7,  171.3,  -86.0,    4.5],
+            [  -2.9,  -67.4,  -51.6,  113.0, -102.3,   63.5],
+            [ -12.9,  -39.2,  -92.3,   93.0,  -96.5,   48.8],
+            [  20.5,  -43.1,  -97.0,   72.4,   83.5,  142.0],
+            [  17.4,  -48.2,  -92.1,   68.7,   98.6,  140.7],
+            [  33.3,  -59.1,  -84.0,   73.8,  103.3,  142.0],
+            [  44.1,  -55.6,  -74.6,   90.9,  101.7,  129.7],
+            [  34.9,  -54.1, -101.1,   67.1,   90.1,  156.9],
+            [  35.3,  -53.9, -105.3,   66.8,  100.5,  160.0],
+            [  15.6,  -54.7, -111.5,   35.4,   90.7,  171.9],
+            [  25.4,  -36.5, -106.1,   32.5,   73.9,  160.1],
+            [  22.7,  -59.3,  -81.2,   24.5,   94.3,  160.0],
+            [  23.9,  -79.0,  -74.5,   14.6,   97.2,  172.3],
+            [ -12.9,  -49.3,  -95.7,    0.0,   86.5,  180.0],
+        ]))
         
-        # CRS97
-        # levels = [np.array([0, -10, -115, 0, -55, 0]), np.array([0, -30, -110, 0, -40, 0]),
-        #           np.array([0, -45, -102, 0, -33, 0])]
-
-        # offsets = [-20, -15, -10, -5, 0 , 5, 10, 15]
-        # angles = [0, 15]
-        # for level in levels:
-        #     for offset in offsets:
-        #         config = level
-        #         config[0] = offset
-        #         for angle in angles:
-        #             config[4] += angle
-        #             self.calibration_aruco_configurations.append(np.deg2rad(config))
-        #             config[4] -= angle
+        for config in self.calibration_aruco_configurations:
+            if not self.robot.in_limits(config):
+                print(f"Configuration {config} is out of limits")
 
         print(np.rad2deg(self.calibration_aruco_configurations).round()) 
-
-
-        
-
-        # self.calibration_aruco_configurations = [
-        #     np.deg2rad([-10, 30, 130, 0, -70, 0]),
-        #     np.deg2rad([-5, 30, 130, 0, -70, 0]),
-        #     np.deg2rad([0, 30, 130, 0, -70, 0]),
-        #     np.deg2rad([5, 30, 130, 0, -70, 0]),
-        #     np.deg2rad([5, 30, 130, 0, -70, 30]),
-        #     np.deg2rad([10, 30, 130, 0, -70, 0]),
-        #     np.deg2rad([15, 30, 130, 0, -70, 0]),
-        #     np.deg2rad([20, 30, 130, 0, -70, 0]),
-        #     np.deg2rad([25, 30, 130, 0, -70, 0]),
-        #     np.deg2rad([25, 15, 145, 0, -70, 0]),
-        #     np.deg2rad([20, 15, 145, 0, -70, 0]),
-        #     np.deg2rad([15, 15, 145, 0, -70, 0]),
-        #     np.deg2rad([10, 15, 145, 0, -70, 0]),
-        #     np.deg2rad([5, 15, 145, 0, -70, 0]),
-        #     np.deg2rad([5, 15, 145, 0, -70, 30]),
-        #     np.deg2rad([0, 15, 145, 0, -70, 0]),
-        #     np.deg2rad([-5, 15, 145, 0, -70, 0]),
-        #     np.deg2rad([-10, 15, 145, 0, -70, 0]),
-        #     np.deg2rad([-10, 45, 115, 0, -70, 0]),
-        #     np.deg2rad([-5, 45, 115, 0, -70, 0]),
-        #     np.deg2rad([0, 45, 115, 0, -70, 0]),
-        #     np.deg2rad([5, 45, 115, 0, -70, 0]),
-        #     np.deg2rad([5, 45, 115, 0, -70, 30]),
-        #     np.deg2rad([10, 45, 115, 0, -70, 0]),
-        #     np.deg2rad([15, 45, 115, 0, -70, 0]),
-        #     np.deg2rad([20, 45, 115, 0, -70, 0]),
-        #     np.deg2rad([25, 45, 115, 0, -70, 0]),
-        #     np.deg2rad([25, 45, 145, 0, -100, 0]),
-        #     np.deg2rad([20, 45, 145, 0, -100, 0]),
-        #     np.deg2rad([15, 45, 145, 0, -100, 0]),
-        #     np.deg2rad([10, 45, 145, 0, -100, 0]),
-        #     np.deg2rad([5, 45, 145, 0, -100, 0]),
-        #     np.deg2rad([5, 45, 145, 0, -100, -30]),
-        #     np.deg2rad([0, 45, 145, 0, -100, 0]),
-        #     np.deg2rad([-5, 45, 145, 0, -100, 0]),
-        #     np.deg2rad([-10, 45, 145, 0, -100, 0]),
-        #     np.deg2rad([-10, 60, 100, 0, -70, 0]),
-        #     np.deg2rad([-5, 60, 100, 0, -70, 0]),
-        #     np.deg2rad([0, 60, 100, 0, -70, 0]),
-        #     np.deg2rad([5, 60, 100, 0, -70, 0]),
-        #     np.deg2rad([5, 60, 100, 0, -70, -30]),
-        #     np.deg2rad([10, 60, 100, 0, -70, 0]),
-        #     np.deg2rad([15, 60, 100, 0, -70, 0]),
-        #     np.deg2rad([20, 60, 100, 0, -70, 0]),
-        #     np.deg2rad([25, 60, 100, 0, -70, 0]),
-        #     np.deg2rad([-10, 60, 100, 0, -90, 0]),
-        #     np.deg2rad([-5, 60, 100, 0, -90, 0]),
-        #     np.deg2rad([0, 60, 100, 0, -90, 0]),
-        #     np.deg2rad([5, 60, 100, 0, -90, 0]),
-        #     np.deg2rad([5, 60, 100, 0, -90, 0]),
-        #     np.deg2rad([10, 60, 100, 0, -90, 0]),
-        #     np.deg2rad([15, 60, 100, 0, -90, 0]),
-        #     np.deg2rad([20, 60, 100, 0, -90, 0]),
-        #     np.deg2rad([25, 60, 100, 0, -90, 0]),
-        # ]
-
 
     def solve_AX_YB(self, gripper_poses, robot_poses):
         """
@@ -365,7 +308,11 @@ class RobotBox():
 
     def find_boards(self):
         if self.robot._initialized:
-            self.robot.move_to_q(np.deg2rad([90, 0, 90, 0, 90, 0]))
+            if self.robot_type == RobotType.RV6S:
+                self.robot.move_to_q(self.robot._np.deg2rad([90, 0, 90, 0, 90, 0]))
+            elif self.robot_type == RobotType.CRS97 or self.robot_type == RobotType.CRS93:
+                # self.robot.move_to_q(self.robot.q_home)
+                self.robot.move_to_q(self.robot.get_q() + np.deg2rad([90, 0, 0, 0, 0, 0]))
             self.robot.wait_for_motion_stop()
         else:
             print("No robot found")

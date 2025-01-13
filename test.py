@@ -4,160 +4,175 @@ from src.camera_image import CameraImage
 from src.scene3d import Scene3D
 from src.robot_box import RobotBox, RobotType
 from src.se3 import SE3
-from capture_image import capture_single_image
+from src.so3 import SO3
+from pathlib import Path
 
+def create_path_points(start, end, interval=30):
+    """Create points along a line from start to end with given interval."""
+    # Calculate direction vector
+    direction = end - start
+    # Number of points needed
+    distance = np.linalg.norm(direction)
+    num_points = int(np.ceil(distance / interval))
+    # Create evenly spaced points
+    points = np.linspace(start, end, num_points)
+    return points
 
-# cur fk in soft home: 
-# [[-1.41381099e-04 -1.75942261e-04  9.99999975e-01  4.43778074e-01]
-#  [ 6.59554259e-05  9.99999982e-01  1.75951587e-04  6.26756665e-05]
-#  [-9.99999988e-01  6.59803004e-05 -1.41369492e-04  8.43467930e-01]
-#  [ 0.00000000e+00  0.00000000e+00  0.00000000e+00  1.s00000000e+00]]
+def find_next_target(current_pos, path_points, lookahead_distance=70):
+    """Find the furthest point within lookahead distance on the path."""
+    # Calculate distances to all points
+    distances = np.linalg.norm(path_points - current_pos, axis=1)
+    
+    # Find the closest point index
+    closest_idx = np.argmin(distances)
+    
+    # Look ahead from the closest point
+    candidates = path_points[closest_idx:]
+    if len(candidates) == 0:
+        return None
+        
+    # Among points ahead, find the furthest one within lookahead distance
+    distances_ahead = np.linalg.norm(candidates - current_pos, axis=1)
+    valid_indices = np.where(distances_ahead <= lookahead_distance)[0]
+    
+    if len(valid_indices) == 0:
+        # If no points within lookahead, take the closest point ahead
+        return candidates[0]
+    
+    # Return the furthest valid point
+    furthest_idx = valid_indices[-1]
+    return candidates[furthest_idx]
 
-# cur fk in [0, 0, -45, 0, -45, 0]: 
-# [[-1.41381099e-04 -1.75942261e-04  9.99999975e-01  4.43778074e-01]
-#  [ 6.59554259e-05  9.99999982e-01  1.75951587e-04  6.26756665e-05]
-#  [-9.99999988e-01  6.59803004e-05 -1.41369492e-04  8.43467930e-01]
-#  [ 0.00000000e+00  0.00000000e+00  0.00000000e+00  1.00000000e+00]]
-
-
-box = RobotBox(RobotType.CRS97)
+box = RobotBox(RobotType.CRS93)
 scene = Scene3D().z_from_zero()
 
-# img = box.camera.grab_image()
-# arucos = img.get_arucos(29, cv2.aruco.DICT_6X6_50)
-# img.draw_arucos(arucos)
-# img.display()
-# scene.add_robot(box, box.robot.get_q())
-# scene.display()
-# exit()
-# box.gripper.open()
-box.robot.soft_home()
-box.robot.wait_for_motion_stop()
-# cur_q = box.robot.get_q()
-# cur_fk = box.robot.fk(cur_q)
-# print("cur fk in soft home:", cur_fk)
-# box.robot.move_to_q(box.robot.get_q() + np.deg2rad([-90, 0, 0, 0, 0 ,0]))
-# box.robot.move_to_q(box.robot.get_q() + np.deg2rad([0, 0, -45, 0, -45 ,0]))
-# cur_fk2 = box.robot.fk(cur_q)
-# print(f"cur fk in {[0, 0, -45, 0, -45 ,0]}:", cur_fk2)
-# box.robot.wait_for_motion_stop()
+# Get initial configuration
+current_config = box.robot.get_q()
 
+# Define start and end points
+start_point = np.array([600, -150, 200])
+end_point = np.array([600, 150, 200])
 
-# # from src.camera import Camera
-# # # box.camera = Camera(RobotType.CRS97)
+# Create path points
+path_points = create_path_points(start_point, end_point)
+print(path_points)
+# Create rotation matrix where:
+# x points down (negative z in world frame)
+# z points in x direction (positive x in world frame)
+# y will be automatically determined to maintain right-hand rule
+down_x = np.array([0, 0, -1])  # x axis points down
+forward_z = np.array([1, 0, 0])  # z axis points forward (in x direction)
+right_y = -np.cross(down_x, forward_z)  # y axis is determined by cross product
 
-# img = None
-# img = box.camera.grab_image()
-# while img.image is None or img.image.size == 0:
-#     img = box.camera.grab_image()
-#     print("waiting for image")
+# Create rotation matrix from these axes
+up_rotation = SO3(rotation_matrix=np.column_stack([down_x, right_y, forward_z]))
 
-# arucos = img.get_arucos(
-#                 box.CALIBRATION_ARUCO_SIZE, box.CALIBRATION_ARUCO_DICT)
-# print(arucos)
-# img.draw_arucos(arucos)
+# Create transforms for visualization
+for i, point in enumerate(path_points):
+    pose = SE3(
+        translation=point,
+        rotation=up_rotation
+    )
+    scene.add_transform(f"Path_{i}", pose)
 
-# img.display()
+# First move to the starting point
+start_pose = SE3(
+    translation=start_point,
+    rotation=up_rotation
+)
 
+print("\nMoving to start point...")
+try:
+    ik_solutions = box.robot.ik(start_pose.to_matrix())
+    # Sort by distance to current config
+    distances = [np.linalg.norm(sol - current_config) for sol in ik_solutions]
+    sorted_indices = np.argsort(distances)
+    
+    # Try all solutions for start point
+    solution_found = False
+    for idx in sorted_indices:
+        solution = ik_solutions[idx]
+        print(f"Start solution {idx}: {np.rad2deg(solution).round(1)}")
+        if box.robot.in_limits(solution):
+            print(f"Moving to start point... (using solution {idx})")
+            box.robot.move_to_q(solution)
+            current_config = solution
+            configs = [current_config]  # Reset configs to start with this one
+            solution_found = True
+            break
+    
+    if not solution_found:
+        print("Could not reach start point - no valid solution")
+        exit()
+        
+except Exception as e:
+    print(f"IK failed for start point: {e}")
+    exit()
 
+# Continue with pure pursuit
+reached_end = False
 
-# box.gripper.close()
-# fk = box.robot.fk(box.robot.get_q())
-# print(fk)
-# goal = [[-1, 0, 0, 0.4],
-#  [0, 1, 0, 0],
-#  [0, 0, -1, 0.300],
-#  [0, 0, 0, 1]]
-# q = box.robot.ik(goal)
+while not reached_end:
+    # Get current position
+    current_transform = SE3().from_matrix(box.robot.fk(current_config))
+    current_pos = current_transform.translation
+    print(f"\nCurrent position: {current_pos.round(2)}")
+    
+    # Find next target point
+    next_point = find_next_target(current_pos, path_points)
+    
+    if next_point is None:
+        print("Reached end of path")
+        break
+    
+    print(f"Next target: {next_point.round(2)}")
+    
+    # Create target pose
+    target_pose = SE3(
+        translation=next_point,
+        rotation=up_rotation
+    )
+    
+    # Get IK solution
+    try:
+        ik_solutions = box.robot.ik(target_pose.to_matrix())
+        # Sort by distance to current config
+        distances = [np.linalg.norm(sol - current_config) for sol in ik_solutions]
+        sorted_indices = np.argsort(distances)
+        
+        # Try all solutions, starting with the closest one
+        solution_found = False
+        for idx in sorted_indices:
+            solution = ik_solutions[idx]
+            print(f"Solution {idx}: {np.rad2deg(solution).round(1)}")
+            if box.robot.in_limits(solution):
+                print(f"Moving to next point... (using solution {idx})")
+                box.robot.move_to_q(solution)
+                current_config = solution
+                configs.append(current_config)
+                solution_found = True
+                break
+        
+        if not solution_found:
+            print("No valid solution found - all solutions out of limits")
+            break
+            
+    except Exception as e:
+        print(f"IK failed: {e}")
+        break
+    
+    # Check if we're close to the end point
+    if np.linalg.norm(current_pos - end_point) < 30:
+        print("Reached end point")
+        reached_end = True
 
-# box.robot.move_to_q(q[0])
+# Print the configurations
+print("\nGenerated Configurations:")
+print("np.deg2rad(np.array([")
+for config in configs:
+    config_deg = np.rad2deg(config).round(1)
+    print(f"    [{config_deg[0]:6.1f}, {config_deg[1]:6.1f}, {config_deg[2]:6.1f}, {config_deg[3]:6.1f}, {config_deg[4]:6.1f}, {config_deg[5]:6.1f}],")
+print("]))")
 
-# q = box.robot.ik(fk)
-
-# box.robot.move_to_q(box.robot.get_q() + np.deg2rad([90, 0, 0, 0, 0, 0]))
-# num_of_imgs = 5
-# for i in range(num_of_imgs):
-    # key = input("press c to capure img:")
-    # if key == 'c':
-        # # print(f"capturing img num {i}")
-#         # img = box.camera.grab_image()
-        # img.display(window_name=f"captured {i} img")
-    # else: 
-        # print("wrong key")    
-# box.robot.wait_for_motion_stop()
-# boards = box.find_boards()
-# box.gripper.open()
-# for board in boards:
-#     scene.add_board(board)
-
-# scene.display()
+scene.display()
 box.close()
-
-# box.robot.move_to_q(np.deg2rad([0, 90, 0, 0, 0, 0]))
-# box.robot.move_to_q(np.deg2rad([0, 0, 90, 0, 0, 0]))
-# box.robot.move_to_q(np.deg2rad([0, 30, 130, 0, -70, -90]))
-# q_soft_home = np.deg2rad([90, 0, 90, 0, 90, 0])
-# q_soft_home = np.deg2rad([0, 60, 60, 0, 60, 0])
-# box.robot.move_to_q(q_soft_home)
-# box.robot.wait_for_motion_stop()
-# print(box.robot.fk(q_soft_home))
-# box.robot.soft_home()
-# box.robot.wait_for_motion_stop()
-# q = box.robot.get_q()
-# scene.add_robot(box, q_soft_home)
-# scene.display()
-# scene.add_robot(box, np.deg2rad([0, 30, 130, 0, -70, -90]))
-# scene.display()
-
-
-# # Load camera calibration
-# camera_matrix = np.load("calibration/calibration_data/camera_matrix.npy")
-# dist_coeffs = np.load("calibration/calibration_data/dist_coeffs.npy")
-
-# # Create image scene
-# image = CameraImage(camera_matrix, dist_coeffs)
-# image.set_image(cv2.imread("images/capture_20241219_174515.png"))
-
-# # Detect ArUco markers and boards
-# arucos = image.get_arucos(36, cv2.aruco.DICT_4X4_50)
-# boards = image.detect_boards()
-# image.mark_boards_empty(boards)
-
-# # Draw markers and board slots
-# image.draw_arucos(arucos)
-# for board in boards:
-#     image.draw_board_slots(board)
-
-
-# image.display()
-
-# # Create 3D scene for camera view
-# scene_camera = Scene3D().invert_z_axis().z_from_zero()
-# scene_camera.add_transform("Camera", SE3())
-
-# # Add ArUco markers
-# for marker_id, pose in arucos.items():
-#     scene_camera.add_transform(f"ID: {marker_id}", pose)
-
-# # Add boards and their slots
-# for board in boards:
-#     scene_camera.add_board(board)
-
-# scene_camera.display()
-
-# # Create robot scene
-# scene_robot = Scene3D().z_from_zero()
-# box = RobotBox(RobotType.CRS97, robot_active=False, camera_active=False)
-
-# # Show robot in home position
-# print("Visualizing home position...")
-# calibration_aruco_configurations = [
-#     np.deg2rad([0, 30, 130, 0, -70, -90]),
-#     np.deg2rad([20, 30, 130, 0, -70, -90]),
-#     np.deg2rad([40, 30, 130, 0, -70, -90]),
-#     np.deg2rad([-20, 30, 130, 0, -70,rv6s -90]),
-#     np.deg2rad([-40, 30, 130, 0, -70, -90])
-# ]
-# for config in calibration_aruco_configurations:
-#     scene_robot.add_robot(box, q=config)
-#     scene_robot.display()

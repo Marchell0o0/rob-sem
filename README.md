@@ -8,10 +8,10 @@ This project provides tools for robot control and camera calibration.
 
 ```bash
 # Capture calibration images
-python -m calibration.capture_calibration_images
+python -m calibration.capture_calibration_images --images-count 30
 
 # Run calibration
-python -m calibration.calibrate_with_chessboard --board-width 9 --board-height 6 --square-size 5
+python -m calibration.calibrate_with_chessboard --board-width 7 --board-height 5 --square-size 30 --marker-size 22
 ```
 
 2. Robot Control:

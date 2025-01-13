@@ -8,7 +8,7 @@ from src.enums import RobotType
 from src.camera_image import CameraImage
 
 
-def capture_calibration_images(robot_type: RobotType):
+def capture_calibration_images(robot_type: RobotType, images_count: int):
     # Create directory for calibration images if it doesn't exist
     if not os.path.exists('calibration/calibration_images'):
         os.makedirs('calibration/calibration_images')
@@ -17,7 +17,7 @@ def capture_calibration_images(robot_type: RobotType):
     camera = Camera(robot_type)
     try:
         captured_frames = 0
-        required_frames = 15
+        required_frames = images_count
         quit_program = False
 
         while captured_frames < required_frames and not quit_program:
@@ -62,11 +62,12 @@ def capture_calibration_images(robot_type: RobotType):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--robot-type", type=str,
-                        default="RV6S", help="Type of the robot")
+                        default="CRS93", help="Type of the robot")
+    parser.add_argument("--images-count", type=int, default=15, help="How many images to capture")
     args = parser.parse_args()
     print("This script will capture 30 images for camera calibration.")
     print("Position the calibration grid and press SPACE for each capture.")
     print("Try to capture the grid from different angles and positions.")
     print("\nPress Enter to start capturing...")
     input()
-    capture_calibration_images(RobotType[args.robot_type])
+    capture_calibration_images(RobotType[args.robot_type], args.images_count)

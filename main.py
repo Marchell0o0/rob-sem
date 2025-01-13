@@ -23,22 +23,32 @@ box = RobotBox(RobotType[args.robot_type],
                args.robot_active, args.camera_active)
 
 
-# for cfg in box.calibration_aruco_configurations:
-#     box.robot.move_to_q()
 
-# exit()
 scene_base = Scene3D().z_from_zero()
 scene_camera = Scene3D().z_from_zero()
 
-
 # camera_to_base = box.get_camera_to_base_transform()
+# exit()
 
 
 # # Load and fix the camera-to-base transform
 camera_to_base_matrix = np.load("calibration/calibration_data/camera_to_base.npy")
 gripper_to_flange_matrix = np.load("calibration/calibration_data/gripper_to_flange.npy")
 
+print("Camera to base new: ", camera_to_base_matrix)
+print("Gripper to flange new: ", gripper_to_flange_matrix)
+
+camera_to_base_matrix += np.load("calibration/calibration_data/working_camera_to_base.npy")
+gripper_to_flange_matrix += np.load("calibration/calibration_data/working_gripper_to_flange.npy")
+
+
+camera_to_base_matrix = camera_to_base_matrix / 2
+gripper_to_flange_matrix = gripper_to_flange_matrix / 2
+
+offset = SE3(rotation=SO3.from_euler_angles(np.deg2rad(np.array([0, 0, 3])), ["x", "y", "z"]), translation=[0, 0, 0])
+
 camera_to_base = SE3().from_matrix(camera_to_base_matrix, "meters")
+camera_to_base = camera_to_base * offset
 gripper_to_flange = SE3().from_matrix(gripper_to_flange_matrix, "meters")
 
 
@@ -123,6 +133,10 @@ for ((slot_idx, slot), (cube_idx, cube)) in zip(destination_board.slot_transform
             configurations = box.robot.ik(data.to_matrix())
             # Sort configurations by distance to previous configuration
             configurations = sort_configurations_by_distance(configurations, previous_configuration)
+
+            if not configurations:
+                print("No configurations found")
+                exit()
 
             print("Most likely configuration: ", np.rad2deg(configurations[0]).round())
 
