@@ -312,7 +312,7 @@ class RobotBox():
                 self.robot.move_to_q(self.robot._np.deg2rad([90, 0, 90, 0, 90, 0]))
             elif self.robot_type == RobotType.CRS97 or self.robot_type == RobotType.CRS93:
                 # self.robot.move_to_q(self.robot.q_home)
-                self.robot.move_to_q(self.robot.get_q() + np.deg2rad([90, 0, 0, 0, 0, 0]))
+                self.robot.move_to_q(np.deg2rad([90, 0, -45, 0, -45, 0]))
             self.robot.wait_for_motion_stop()
         else:
             print("No robot found")
@@ -325,6 +325,8 @@ class RobotBox():
 
         # Get ArUco corners
         aruco_corners = img.get_aruco_corners(self.BOARD_ARUCO_DICT)
+
+        print(aruco_corners)
         # Create boards for each valid pair
         boards = []
         for pair in Board.VALID_PAIRS:

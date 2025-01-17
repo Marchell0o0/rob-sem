@@ -6,7 +6,7 @@ import cv2
 
 class Board:
     # Valid marker pairs that define boards
-    VALID_PAIRS = [(1, 2), (3, 4), (5, 6), (7, 8)]
+    VALID_PAIRS = [(1, 2), (3, 4), (5, 6), (7, 8), (9, 10), (11, 12)]
     MARKER_SIZE = 36  # mm
 
     def __init__(self, marker1_id: int, marker2_id: int):
